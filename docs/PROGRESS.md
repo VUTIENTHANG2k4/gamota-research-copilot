@@ -136,3 +136,53 @@ JSON schema: 1 retry needed in 25+ extract calls.
 7. Not checked: whether conflict explanations are correct beyond the label re-check; no independent grading (P4). Thresholds (10% difference, 0.25 word-overlap) are initial proposals, not calibrated.
 
 **P3 gate: approved by the user on 2026-10-13 with limitations recorded**: D4 (SYN07/08 genuine conflict) and D5 (SYN09 unrelated) not exercised end to end; D2 only partly. P4 must either design scenarios that run them through the real pipeline or report "not tested".
+
+## P4 - memo, baseline, T1-T9 (2026-10-13) - IN PROGRESS
+
+**Built**: `app/pipeline.py` (P2+P3 as one callable), `app/memo.py` (LLM writes points from A/B claims by claim ID; code relabels any fact point without a valid ID or with numbers not in the cited claims, labels draft-law claims, computes confidence/refusal, gaps, assumptions, next steps), `app/baseline.py` (direct LLM answer, no corpus), `tests/run_eval.py` (`--run N` = full round, `--score` = score saved rounds with no LLM calls). Expectations in the scoring code are those of spec 06, fixed before any result.
+
+**Infrastructure problems met (all real, all fixed in `app/llm.py`)**
+- Free tier = 50 requests/day per account (HTTP 429 `free-models-per-day`); user supplied extra keys, `OPENROUTER_API_KEYS` rotates them (the main agent noted this may conflict with OpenRouter terms; user's decision).
+- OpenRouter sometimes returns HTTP 200 with an error body ("provider overloaded"); now treated as a retryable error. Client timeout raised to 300 s and retried. Identical requests are cached under `runs/cache/` (temperature 0).
+- A syntax check I ran by importing `scripts/run_p3.py` ran the pipeline at import and burned part of a day's quota (my mistake).
+- Call latency on the free endpoint is 60+ s; one round takes about 1.5 h.
+
+**Defect found by round 1 (v1) and kept as evidence**: the new "needs clarification" gate in the brief was too eager. In `runs/p4/round_1_gate_v1` it stopped 5 of 7 questions (Q1, Q4, Q5, A, B) before any retrieval, so scores for T1, T3, T5 and the D traps in that run say nothing about the pipeline. The brief prompt was changed (clarification only when the topic or decision cannot be identified); the full round was re-run as `runs/p4/round_1`. Only T6 should trigger the gate. The brief prompt change was made after seeing results; it changes behaviour, not any expectation or threshold.
+
+**Result: one round only.** Round 2 (stability) could not run: the three free-tier keys (50 requests/day each) were used up by round 1 and the gate re-run, and a Docker restart cost one more attempt. Stability between runs was NOT measured, so "each scenario at least twice" is not met. The user decided (2026-10-13) to grade one round and record this.
+
+**Independent grading** by the `evaluator` subagent (Vietnamese report: `tests/reports/20261013-2115.md`). It hand-checked all 48 valid claims, 17 source grades, the memos and the baseline, with no LLM calls.
+
+| Scenario | Machine | Evaluator |
+|---|---|---|
+| T1 (Q3, works well) | Fail | **Fail**: the 60/180 rule is absent from the memo (the S001 chunks that contain it were never retrieved); overall Medium, High unreachable (S001-S003 are one origin) |
+| T2 (Q2, two figures) | Pass | **Pass only with SYNTHETIC**; Fail on real documents (all 5 sub-questions refused) |
+| T3 (reposts) | Pass | Pass (mechanism); ran through extra question A, effect on confidence not exercised |
+| T4 (stale data) | Pass | Pass with caveat: the stale figure still appears in the memo's conflict section |
+| T5 (Q4 missing data) | Fail | **Fail**: the actual-D7 sub-question is refused correctly, but the memo shows an industry D7 benchmark and overall Medium |
+| T6 (ambiguous) | Pass | Pass (3 clarifying questions; one run) |
+| T7 (PDF tables/charts) | needs hand check | **Fail**: a pie chart misread with no flag; 1 table claim right; 1 truncated table cell turned into a claim. Matches the pre-registered prediction |
+| T8 (baseline) | Fail | Fail (partly): MVP 0 unsupported figures vs about 32 in the baseline by hand count (machine counted 1); the baseline refuses Q4, the MVP does not refuse overall |
+| T9 (draft vs in force) | Fail | **Fail**: Decree 147/2024 not named as main evidence; the draft label never fired (not testable) |
+
+Traps: D1-D4 caught (D2 and D4 only through the extra questions A and B); D5 (SYN09) never retrieved, so not testable. Nominal 4/5.
+
+**Metrics vs targets**
+- Citation accuracy: 95.8% (46/48) on "passage says what the claim says", but 92.9% (26/28) on real documents only (target 95%: missed) and 72.9% (35/48) when scope/context errors count.
+- Source-grade agreement: 82.4% (14/17), target 80%: met, narrowly.
+- Correct refusal on questions that truly lack data: 50% (Q4, Q5), target 100%: missed.
+- Supported fact sentences in memos: 61.5% by machine, 92.3% after the evaluator corrected false demotions, on only 13 sentences (target 90%).
+- Confidence calibration: not assessable (no High verdict anywhere).
+- Versus baseline: MVP clearly has fewer unsupported figures.
+- Time: 4-11 minutes per question on the free model. Claims rejected at verify: 43%. JSON valid without retry: 41/42.
+
+**Top open defects (impact order, from the evaluator; none fixed, because a fix would invalidate the measured round and no LLM quota is left)**
+1. No check that a valid A/B claim actually answers the sub-question, so Medium is given to irrelevant, truncated or opinion claims; the confidence label means little.
+2. `app/memo.py` computes the overall level from answered sub-questions only (lines ~96-101): Q4 and Q1 show "Medium" while their core sub-question is refused. 3 of 6 Medium sub-questions have no sentence under them.
+3. Retrieval and verify miss data present in the corpus: 43% of claims rejected, about 9 of 39 rejections are apostrophe/punctuation mismatches; Q2 revenue and the S001 60/180 rule are never extracted.
+4. The memo number check counts digits inside IDs such as "SYN05" and "C-dff7cd85", so 4 of 5 demoted fact sentences were actually correct (the machine 61.5% is understated).
+5. PDF tables and charts are misparsed without any flag; the source grade varies with the wording of the sub-question; LLM-written scope and conflict explanations can go beyond the evidence.
+
+**Not checked**: stability between runs, human analyst review (step not implemented; claims are auto-approved), embeddings (bge-m3 not tried), a second model.
+
+**Gate P4 ("T1-T9 table has real results")**: met in the sense that every scenario has a real, independently graded result, including 5 failures. It does not show a product that answers Q2, Q3 and Q4 well.

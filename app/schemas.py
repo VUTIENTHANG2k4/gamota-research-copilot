@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SubQuestion(BaseModel):
@@ -14,8 +14,18 @@ class SubQuestion(BaseModel):
 class Brief(BaseModel):
     decision: str
     scope: str
-    sub_questions: list[SubQuestion] = Field(min_length=3, max_length=5)
-    clarifying_questions: list[str] = Field(default_factory=list, max_length=3)
+    needs_clarification: bool  # true when the question is too vague to research
+    sub_questions: list[SubQuestion] = Field(max_length=5)  # required; empty only if needs_clarification
+    clarifying_questions: list[str] = Field(max_length=3)  # required; may be empty for a clear question
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.needs_clarification:
+            if not 1 <= len(self.clarifying_questions) <= 3:
+                raise ValueError("needs_clarification requires 1-3 clarifying questions")
+        elif len(self.sub_questions) < 3:
+            raise ValueError("a clear question needs 3-5 sub_questions")
+        return self
 
 
 class DraftClaim(BaseModel):
