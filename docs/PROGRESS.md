@@ -102,3 +102,37 @@ JSON schema: 1 retry needed in 25+ extract calls.
 - Not checked: whether valid claims are semantically right (only the code check), and a repeat run of the final configuration for stability.
 
 **P2 gate: approved by the user on 2026-10-13 with Q2 recorded as a known limitation** (no valid claim from the real revenue sources S014/S004/S007; keyword retrieval only; bge-m3 not tried). This must appear in the test report and on the Known limitations page.
+
+## P3 - grade, dedupe, conflict, confidence, refusal (2026-10-13)
+
+**Built**: `app/grade.py` (score table of spec 03, components shown per source), `app/dedupe.py` + `corpus/origin_groups.csv`, `app/conflict.py` (code finds candidate pairs; LLM only labels the cause; code re-checks the label), `app/confidence.py` (hard rules + refusal), `scripts/run_p3.py` (writes `runs/p3/Q*.json`), `tests/test_p3.py`. 22 tests pass (no LLM). Run on `runs/p2` (Q1,Q3,Q4,Q5 = run 4; Q2 = run 5). LLM calls: 11 conflict labels on the `:free` model.
+
+**Source grades** (30 sources; components in `runs/p3/*.json`): A = S001-S003 (primary decree text), SYN05-SYN08 (SYNTHETIC reports); B = S004-S006; C = S007-S010, S012, S013, SYN02-04, SYN09; D = S011, S014-S018, SYN01, SYN10-SYN12. The 825M source (S014) is D (press release, Gamota conflict of interest).
+
+**Verdicts per sub-question** (headline = real documents only; second = test mode including SYNTHETIC):
+| Q | real only | with SYNTHETIC |
+|---|---|---|
+| Q1 | 1 Medium, 4 "Chưa đủ căn cứ" | same |
+| Q2 | 5 of 5 "Chưa đủ căn cứ" | 2 Medium, 3 "Chưa đủ căn cứ" |
+| Q3 | 3 Medium, 2 "Chưa đủ căn cứ" | same |
+| Q4 | 4 of 4 "Chưa đủ căn cứ" | same |
+| Q5 | 5 of 5 "Chưa đủ căn cứ" | same |
+
+**P3 gate: "traps caught, Q4 refused"**
+- **Q4 refused: yes.** All 4 sub-questions give "Chưa đủ căn cứ" in both modes: the only claims come from SYN10, which is grade D (internal, unverified, simulated, no D7 figure).
+- **D1 stale figure (SYN01): caught by grade** (freshness 0, grade D) and by a year-labelled conflict in unit tests. In the Q2 run its claim 0,6 tỷ USD (2021) appears with grade D.
+- **D3 two definitions (SYN05 700M vs SYN06 490M): caught end to end.** Conflict found by code (30% apart), cause labelled `definition`, explained, confidence Medium instead of High.
+- **D2 three reposts: dedupe works in unit tests only** (SYN02-04 and S007/S008 and S016-S018 each count as 1 origin). End to end only SYN02 produced claims, so it was not exercised in a full run.
+- **D4 genuine conflict (SYN07 18% vs SYN08 9%): NOT exercised end to end.** No valid claim from SYN07/SYN08 in the current Q1 run (the claims were rejected by verify in earlier runs). The rule (unexplained conflict -> Low) is only covered by unit tests with hand-made inputs.
+- **D5 unrelated document (SYN09): never retrieved**, so not exercised.
+
+**Defects found (not hidden)**
+1. The model left `value`/`unit` empty in most claims, so conflict detection first found 0 conflicts anywhere. Fixed with a code fallback that reads the first money amount or percentage from the claim text. This is a heuristic and can pick the wrong number in a long sentence.
+2. Cause labels are only partly checked: SYN01 (2021) vs SYN06 (2025) was labelled `scope` instead of `year`, and code accepted it because the two scope strings differ.
+3. `data_kind` guessed "reviews" from the question wording and downgraded the decree to grade B; fixed (primary legal text is always judged as legal). The keyword rule for kinds remains crude.
+4. Q2 in real-only mode refuses all 5 sub-questions: the pipeline never extracted a valid claim from S004 (B) or S014 (D). This is the P2 limitation passing through; it is the honest output, but it means the product does not yet answer Q2 about the real market.
+5. Q3 is capped at Medium because S001-S003 are one origin (same decree) and the press articles are grade C/D. That is the rule working as specified, not a measurement of correctness.
+6. "Agree" for High confidence is weak: two A/B origins with non-numeric claims are assumed to agree when no numeric conflict is flagged. A claim being valid does not prove it answers the sub-question.
+7. Not checked: whether conflict explanations are correct beyond the label re-check; no independent grading (P4). Thresholds (10% difference, 0.25 word-overlap) are initial proposals, not calibrated.
+
+**P3 gate: approved by the user on 2026-10-13 with limitations recorded**: D4 (SYN07/08 genuine conflict) and D5 (SYN09 unrelated) not exercised end to end; D2 only partly. P4 must either design scenarios that run them through the real pipeline or report "not tested".

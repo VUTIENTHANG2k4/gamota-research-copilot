@@ -11,3 +11,8 @@
 - 2026-10-13 (P2): LLM_MODEL switched to the `:free` slug because paid credits reached 0 (user choice). Data sent stays public + SYNTHETIC only. P0 latency/JSON-schema measurements re-run on `:free`.
 - 2026-10-13 (P2): Retrieval query = Vietnamese + English keywords + original question, top 8, max 2 chunks per document. Reason: cross-language miss and crowding by short SYNTHETIC files. FR2 gold set is not re-measured with this setting.
 - 2026-10-13 (P2): verify.py compares with whitespace removed (PDF text has stray spaces); number and name rules unchanged.
+- 2026-10-13 (P3): Source-type points mapped as approved: legal_primary 4, industry_report 3, press/press_repost/internal 2, press_release/vendor_blog 1; has_methodology 'n/a' counts 2; freshness reference date fixed at 2026-10-13; unknown data date = 0; year-only dates use 31 Dec; press about regulation gets freshness 1 (cannot confirm in force).
+- 2026-10-13 (P3): `corpus/origin_groups.csv` added (S007+S008 -> GameGeek, read in the saved files; S016-S018; SYN02-04; S001-S003). `sources.csv` was not edited.
+- 2026-10-13 (P3): Conflict cause list gets an extra value `legal_status` (draft vs in force) beyond the spec's definition/year/scope/method/unknown, for Q3.
+- 2026-10-13 (P3): Interpretation of the refusal rule: a sub-question with only grade C/D claims gets "Chưa đủ căn cứ" (not "Low"); the spec's "Low: only C/D" row is therefore unused. An explained conflict means Medium even with 2 independent A/B sources.
+- 2026-10-13 (P3): Every verdict is computed twice: real-only (headline) and with SYNTHETIC (test mode), so SYNTHETIC never decides a real-market conclusion.
