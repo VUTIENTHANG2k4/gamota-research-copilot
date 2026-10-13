@@ -40,3 +40,65 @@
 - Real sources were read only by the collector for metadata; contents of PDFs not yet parsed (P2).
 
 **Open defects**: S001-S003 text layer unverified; S017 is 8.6 MB HTML.
+
+## P2 - ingest, retrieve, extract, verify (2026-10-13) - NOT COMPLETE: Q5 re-run blocked
+
+**Built**: `app/ingest.py` (pypdf/bs4 -> 686 page-aware chunks in PostgreSQL, 30 sources), `app/retrieve.py` (BM25, accent-stripped unigram+bigram), `app/brief.py`, `app/extract.py`, `app/verify.py` (code guardrail 1), `app/jsonllm.py` (JSON schema + Pydantic, retry <= 2), `scripts/run_p2.py`, `scripts/eval_retrieval.py`, `tests/test_verify.py` (6 pass).
+
+**Decision (from measurement): keyword search only for now.** FR2 on a 14-query gold set: 14/14 in top-5 (target 80%). Limits: the gold set is small and written by the main agent, expectations are lenient ("any of several documents"), and the short SYNTHETIC files tend to outrank real documents in BM25. bge-m3 NOT tried; pgvector unused. Revisit only if P3/P4 show retrieval misses.
+
+**JSON schema**: `response_format` json_schema worked on every extract/brief call: 0 retries needed in 2 runs.
+
+**Q1-Q5 results (2 runs; run 1 in `runs/p2_run1`, run 2 in `runs/p2`; run 2 prompts changed after run 1, see CHANGES)**
+| Q | Run 1 claims (valid/rejected) | Run 2 claims (valid/rejected) |
+|---|---|---|
+| Q1 | 8 / 4 | 18 / 5 |
+| Q2 | 0 / 0 (**failure**) | 3 / 4 |
+| Q3 | 8 / 8 | 5 / 14 |
+| Q4 | 0 / 0 | 0 / 0 |
+| Q5 | 3 / 0 | not re-run: HTTP 402 from OpenRouter |
+
+**Defects observed (not hidden)**
+1. Run 1 Q2 returned 0 claims although the corpus has the answer: the brief invented vendor names and years in sub-questions (Appota, Niko Partners, data.ai, Sensor Tower, 2023/2024) and the extractor then returned empty. Prompts changed; Q2 now yields 3 valid claims, but only from SYN05/SYN06 (SYNTHETIC) and S008 (a download-count claim, not revenue). **No valid claim from the real revenue sources (S014 825M, S004 575M, S007 315M) was extracted in run 2.** Q2 does not yet meet "valid claims" for the real market.
+2. Run-to-run instability: Q3 valid claims went 8 -> 5 between runs. Results are not stable even at temperature 0 after prompt edits.
+3. The verifier rejects many claims correctly (number or name not in the passage; e.g. model added "Việt Nam", "Công ty Giả Lập Alpha", or decree numbers 147/174 that the passage did not contain). This is the guardrail working, but recall is low. 4-14 rejections per question.
+4. Q3 (regulation): the 60 min / 180 min rule was not extracted as a valid claim in run 2 (not verified either way). Decree PDF text has extraction artifacts ("Truyề n thông", split characters) that break verbatim matching.
+5. Q4: 0 claims, which is the expected "no data" behaviour at this stage; retrieval returned SYN10 (DAU/D1 only) and the model produced no D7 claim. Refusal logic itself is P3.
+6. Q5: 3 valid claims in run 1 from S012/S013 (press articles). Only one run exists.
+7. Infra: host port 5432 was taken by another local PostgreSQL, so our container uses 5434 (`.env`, `.env.example`, compose). OpenRouter returned HTTP 402 `in_flight_budget_exhausted` after ~64 calls (total cost recorded in `runs/`: about 0.11 USD); account credits need topping up to finish the Q5 re-run.
+
+**Not checked**: precision of the valid claims (whether each really matches its source) is untested beyond the code check; no independent grading yet (P4). Duplicate/stale handling belongs to P3.
+
+### P2 addendum (later the same day) - still NOT complete
+
+- **Verifier change (whitespace only):** comparison now ignores ALL whitespace, because the Official Gazette PDF text has stray spaces inside words ("p hút", "trò c hơi") and the model repairs them when quoting. Characters, numbers and names must still match exactly. New test added (7 tests pass). This was found by locating the rule "không quá 60 phút đối với từng trò chơi ... không quá 180 phút một ngày" in S001 pages 74 and 85, which confirms the rule text exists in the corpus (previously "not checked").
+- **Offline re-verification** (`scripts/reverify.py`, no LLM calls) of saved model outputs: run 2 valid claims Q1 18->19, Q2 3->6, Q3 5->10, Q4 0, Q5 3. Valid counts rose because more of the model's quotes matched, not because rules were loosened on numbers or names.
+- **Run files are mixed, read carefully:** `runs/p2_run1` = run 1 (old prompts), `runs/p2_run2` = run 2 (new prompts), `runs/p2` = run 3 attempt: Q1, Q2 fresh; Q3 and Q4 are still run 2 (the run 3 call for Q3 failed with HTTP 402); Q5 is run 1.
+- **Q2 still fails its purpose:** in run 3 the valid claims come from SYN05 (700M), SYN06 (490M), S017 (growth shares) and S008 (downloads). Not one claim from S014 (825M), S004 (575M) or S007 (315M). The LLM-written search queries do not retrieve those passages into the top 5, and short SYNTHETIC files plus S017 crowd them out. So the FR2 score of 14/14 does not transfer to the real pipeline: it used my hand-written queries, not the brief's.
+- **Q3 still fails its purpose:** no valid claim states the 60 min / 180 min rule, although the rule is in S001.
+- **Blocker:** OpenRouter credits are exhausted (HTTP 402 `in_flight_budget_exhausted`), so no further LLM runs are possible until credits are added. User chose to keep Q5 run 1 as is.
+
+### P2 final state (after switching to the `:free` endpoint)
+
+- **Model change:** `.env` `LLM_MODEL` is now `nvidia/nemotron-3-ultra-550b-a55b:free` (paid credit hit 0, confirmed via `/credits`: total_credits 0, usage 0.138 USD). Cost is 0. P0 checks re-run on `:free`: all 3 pass (2.1 s plain, 3.4 s json_schema, 3/3 fallback). Only public and SYNTHETIC documents are sent. `app/llm.py` now retries 429/5xx with 10 s and 30 s backoff.
+- **Retrieval change:** query = brief Vietnamese keywords + English keywords (`search_query_en`, new) + the original question; top 8 chunks, max 2 per document. Reason: Q2 failed because the Vietnamese queries cannot match the English sources (S004, S014, S015).
+- **Run layout:** `runs/p2/` = latest run. Q1, Q3, Q4, Q5 come from run 4 (Vietnamese queries only, per-source cap); Q2 comes from run 5 (bilingual queries). Older runs are in `runs/p2_archive/`.
+
+| Q | claims | valid | rejected | valid claims come from |
+|---|---|---|---|---|
+| Q1 | 15 | 6 | 9 | SYN02, S006, SYN12 |
+| Q2 | 14 | 9 | 5 | SYNTHETIC files + S017 (no S014/S007) |
+| Q3 | 41 | 28 | 13 | S001, S002, S003 (primary decree), S009, S011 |
+| Q4 | 6 | 2 | 4 | SYN10 only: claims that D7 is absent and D1 = 38% |
+| Q5 | 5 | 3 | 2 | S012 |
+JSON schema: 1 retry needed in 25+ extract calls.
+
+**Result against the gate "Q1-Q5 produce valid claims": met for Q1, Q3, Q4, Q5; Q2 only partly.**
+- Q3: the rule 60 min/game and 180 min/day is now extracted (S009 press; primary S001-S003 claims also valid).
+- Q4: no D7 claim was invented; the valid claims state that D7 is missing. P3 must turn this into a refusal.
+- Q5: only S012 yields claims (3), run once on this retrieval setting.
+- **Q2 still unmet for the real market:** valid claims come from SYNTHETIC files and S017 (e.g. 177M USD for H1 2026, a repost of S016, a source with a Gamota conflict of interest). No valid claim from S014 (825M), S004 (575M) or S007 (315M). In the bilingual run S004 was retrieved but produced no valid claim; S014 and S007 were not retrieved because the short SYNTHETIC files and S017 fill the top 8. This is evidence that keyword search is not enough here; bge-m3 not tried.
+- Run-to-run variance: 2 identical-prompt-family runs gave Q3 5 -> 28 valid claims after retrieval changes, so counts are not comparable across runs.
+- Not checked: whether valid claims are semantically right (only the code check), and a repeat run of the final configuration for stability.
+
+**P2 gate: approved by the user on 2026-10-13 with Q2 recorded as a known limitation** (no valid claim from the real revenue sources S014/S004/S007; keyword retrieval only; bge-m3 not tried). This must appear in the test report and on the Known limitations page.

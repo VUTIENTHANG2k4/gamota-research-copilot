@@ -1,0 +1,16 @@
+[
+ {"q":"Q2","query":"doanh thu mobile game Việt Nam 2025 triệu USD","expect_any":["S014","S004","S007","S008"]},
+ {"q":"Q2","query":"Vietnam mobile game revenue 2025 USD million","expect_any":["S014","S004","S007","S008","S015"]},
+ {"q":"Q2","query":"doanh thu game Việt Nam 2024 do studio Việt phát hành GameGeek","expect_any":["S007","S008"]},
+ {"q":"Q2","query":"doanh thu mobile game Việt Nam năm 2025 theo từng định nghĩa đo lường","expect_any":["SYN05","SYN06"]},
+ {"q":"Q3","query":"giới hạn thời gian chơi game dưới 18 tuổi 60 phút 180 phút","expect_any":["S001","S002","S003","S009","S010","S011"]},
+ {"q":"Q3","query":"dự thảo sửa đổi giới hạn thời gian chơi game trẻ em dưới 16 tuổi","expect_any":["S009","S010"]},
+ {"q":"Q3","query":"Nghị định 147/2024/NĐ-CP quản lý internet trò chơi điện tử trực tuyến","expect_any":["S001","S002","S003"]},
+ {"q":"Q3","query":"Nghị định 174/2026 xử phạt mua bán vật phẩm ảo trong game","expect_any":["S011"]},
+ {"q":"Q1","query":"idle RPG mobile Việt Nam xu hướng thể loại","expect_any":["S004","S005","S006","S016","S017","S018","SYN07","SYN08"]},
+ {"q":"Q1","query":"tỷ lệ lượt tải idle RPG Việt Nam 2025","expect_any":["SYN07","SYN08"]},
+ {"q":"Q1","query":"doanh thu nhóm game idle RPG tăng trưởng quý II 2026","expect_any":["SYN02","SYN03","SYN04"]},
+ {"q":"Q4","query":"Retention D7 game của Gamota quý gần nhất","expect_any":["SYN10"]},
+ {"q":"Q5","query":"người chơi phàn nàn Liên Quân Mobile","expect_any":["S012","S013"]},
+ {"q":"Q5","query":"phản ứng cộng đồng Liên Quân Mobile trang phục sự kiện","expect_any":["S012","S013"]}
+]
