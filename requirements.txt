@@ -10,3 +10,4 @@ lxml>=5.0
 psycopg[binary]>=3.2
 rank-bm25>=0.2.2
 fonttools>=4.50
+python-docx>=1.1

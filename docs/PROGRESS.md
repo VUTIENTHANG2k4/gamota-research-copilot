@@ -211,3 +211,24 @@ Traps: D1-D4 caught (D2 and D4 only through the extra questions A and B); D5 (SY
 User asked to split two pieces of work. Priority chosen: report first, lean product later.
 - **Test report for the contest judges (Word, Vietnamese)**: `tests/reports/Bao-cao-kiem-thu-gamota-research-copilot.docx` (10 pages). Built from the evaluator report `tests/reports/20261013-2115.md` and docs/PROGRESS.md without changing any result; includes T1-T9 in Expectation / Actual / Pass-Fail / Lesson form, strengths and weaknesses, metrics vs thresholds, baseline comparison, the limits of the test suite and answers to the 3 mandatory questions. Checked by exporting to PDF with Microsoft Word and viewing pages 1, 4 and 8 (the other pages were not viewed, and the docx XSD validator could not run: python package defusedxml missing).
 - **Lean product (UI + full interaction + deployment)**: NOT started. Decisions already given by the user: deploy = Vercel (UI) + Render/Railway (API, Postgres); interaction = analyst confirm/reject claims, Word/PDF export, persistent question history, answering clarifying questions; test-results and project-log content moves out of the product. Needs free-model quota to verify live runs, so it waits.
+
+## Lean product (2026-10-14) - built, not deployed, not verified with a live model
+
+Split from the contest report at the user's request. The old demo UI is kept in git as tag `demo-p5`. Decisions by the user: deploy on Vercel (UI) + Render (API and PostgreSQL), start with an empty history, no access control, `ui/` replaced in place.
+
+**Built**
+- Backend `api/` (`main.py`, `store.py`, `service.py`, `export.py`): runs, history and review decisions persisted in PostgreSQL (restart-safe; a job interrupted by a restart is marked as such); analyst review (confirm / reject / undo) with confidence recomputed by code at once; "rewrite memo" from non-rejected claims (uses the model); answering clarifying questions (starts a linked new run); Word export with appendix and limitations note; corpus loaded automatically into an empty database; at most 2 concurrent jobs. Contract: `docs/api.md`.
+- UI `ui/` by the `ui-builder` subagent: question box + persistent history, brief/clarify, evidence store with source panel and review buttons, read-only reconciliation, memo with stale warning, rewrite, "Tải Word", "Lưu thành PDF" (browser print with a print stylesheet), short "Giới hạn đã biết". All report/test content (T1-T9, trap mode, baseline, P4 notes) removed from the product.
+- Deployment files: `api/Dockerfile`, `render.yaml`, `.dockerignore`, `.github/workflows/ci.yml` (backend tests against a PostgreSQL service with a fake LLM, UI lint and build), `docs/DEPLOY.md` (steps, changing model/key without code changes, caveats).
+- 29 tests pass locally (22 earlier + 7 for the API with a fake LLM that exists only in `tests/fake_llm.py`).
+
+**Verified**: the API flows (start run, history persists, review, memo rewrite, clarification, Word file content, interrupted-job marking, error text without local paths) with the fake LLM; UI `tsc`, `lint`, `build` clean; the UI in a headless browser against the real backend for home/history, a failed run, a clarification run and the limitations page, and against a mock for finished-run flows (review recompute, stale memo, rewrite, error and special states, 390 px).
+
+**NOT verified (honest list)**
+- A real model run through the new API from question to memo has not been done: the free-model quota (50 requests/day per account) was exhausted again; the one attempt ended as a stored error (HTTP 429), which at least shows the error path works. Retry when quota is available.
+- A real memo rewrite, review decisions on a real finished run, and opening the downloaded Word file in Word were not done (Word content was only checked by reading the docx back in a test). PDF is only the print stylesheet, checked with print emulation.
+- Nothing was deployed: Dockerfile, `render.yaml`, CI and the Vercel settings are untested; `docker build` was not run and the CI workflow has never run on GitHub.
+- No access control: anyone with the link can start runs and spend the deployer's model quota (user decision, shown on the limitations page).
+- The earlier P5 commit missed `ui/app/runs/` because the root `.gitignore` had `runs/`; it is now anchored (`/runs/`). Tag `demo-p5` therefore lacks those pages.
+
+Open defects of the pipeline itself (relevance check, overall confidence, retrieval misses, table/chart parsing) are unchanged; see the P4 section.

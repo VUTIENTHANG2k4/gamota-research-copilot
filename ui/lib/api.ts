@@ -5,13 +5,21 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:800
 
 export type Level = "High" | "Medium" | "Low" | "Chưa đủ căn cứ";
 export type Grade = "A" | "B" | "C" | "D";
+export type RunStatus = "queued" | "running" | "done" | "error" | "needs_clarification";
+export type MemoStatus = "none" | "fresh" | "stale" | "running" | "error";
+export type ReviewState = "none" | "confirmed" | "rejected";
 
 export interface RunSummary {
-  key: string;
-  label: string;
+  id: string;
   question: string;
-  origin: "saved" | "live";
-  origin_note: string;
+  parent_id: string | null;
+  status: RunStatus;
+  stage: string;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+  memo_status: MemoStatus;
+  has_result: boolean;
 }
 
 export interface SubQuestion {
@@ -46,8 +54,6 @@ export interface SourceMeta {
 
 export interface GradeDetail {
   score: number;
-  grade?: Grade;
-  kind?: string;
   components: {
     source_type: number;
     freshness: number;
@@ -60,10 +66,7 @@ export interface GradeDetail {
 export interface Claim {
   claim_id: string;
   content: string;
-  value: number | string | null;
-  unit: string | null;
   scope: string | null;
-  data_date: string | null;
   claim_type: string;
   passage: string;
   chunk_id: string;
@@ -72,9 +75,9 @@ export interface Claim {
   grade: Grade;
   grade_detail: GradeDetail;
   origin_group: string | null;
-  source_type: string;
   src_data_date: string;
   src_publish_date: string;
+  review: ReviewState;
   source: SourceMeta;
 }
 
@@ -113,8 +116,7 @@ export interface Sub {
   claims: Claim[];
   rejected_claims: RejectedClaim[];
   conflicts: Conflict[];
-  verdict_real_only: Verdict;
-  verdict_with_synthetic: Verdict;
+  verdict: Verdict;
 }
 
 export interface MemoPoint {
@@ -138,9 +140,7 @@ export interface MemoSub {
 
 export interface Memo {
   question: string;
-  mode: "real" | "test";
   overall: { level: Level; reason: string };
-  analyst_review: string;
   subs: MemoSub[];
   gaps: string[];
   key_assumptions: string[];
@@ -149,14 +149,21 @@ export interface Memo {
 }
 
 export interface Run {
-  key: string;
+  id: string;
   question: string;
-  needs_clarification: boolean;
-  brief: Brief;
+  parent_id: string | null;
+  created_at: string;
+  finished_at: string | null;
+  status: RunStatus;
+  stage: string;
+  error: string | null;
+  brief: Brief | null;
   subs: Sub[];
-  memo_real: Memo | null;
-  memo_test: Memo | null;
-  baseline: { question: string; answer: string; latency_s: number } | null;
+  review_summary: { confirmed: number; rejected: number };
+  memo: Memo | null;
+  memo_status: MemoStatus;
+  memo_error: string | null;
+  memo_generated_at: string | null;
   timing?: Record<string, number>;
 }
 
@@ -168,35 +175,15 @@ export interface ChunkResponse {
   source: Partial<SourceMeta>;
 }
 
-export interface Job {
-  status: "running" | "done" | "error";
-  stage: string;
-  key: string;
-  question: string;
-  error?: string;
+export interface Health {
+  status: string;
+  mode: string;
+  corpus: { state: "starting" | "ingesting" | "ready" | "error"; chunks: number; error: string | null };
 }
 
-export interface TestResults {
-  report_file: string;
-  title: string;
-  summary_markdown: string;
-  scenario_table_header: string[];
-  scenario_table: string[][];
-  scenario_details_markdown: string;
-  metrics_markdown: string;
-  metrics_table: string[][];
-  baseline_markdown: string;
-  limitations_of_suite_markdown: string;
-  machine_scores: unknown;
-}
-
-export interface Limitations {
-  report_file: string;
-  defects_markdown: string;
-  not_testable_markdown: string;
-  defects_from_progress: string;
-  not_checked: string;
-  fixed_statements: string[];
+export interface About {
+  corpus: { documents: number; synthetic: number; real: number };
+  limitations: string[];
 }
 
 /** Backend not reachable at all (not started, wrong URL, CORS). */
@@ -240,17 +227,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+function sendJson<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return request<T>(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+const enc = encodeURIComponent;
+
 export const api = {
+  health: () => request<Health>("/api/health"),
+  about: () => request<About>("/api/about"),
   runs: () => request<RunSummary[]>("/api/runs"),
-  run: (key: string) => request<Run>(`/api/runs/${encodeURIComponent(key)}`),
-  chunk: (id: string) => request<ChunkResponse>(`/api/chunks/${encodeURIComponent(id)}`),
-  startRun: (question: string) =>
-    request<{ job_id: string; key: string }>("/api/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
-    }),
-  job: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}`),
-  testResults: () => request<TestResults>("/api/test-results"),
-  limitations: () => request<Limitations>("/api/limitations"),
+  run: (id: string) => request<Run>(`/api/runs/${enc(id)}`),
+  startRun: (question: string) => sendJson<{ id: string }>("POST", "/api/runs", { question }),
+  deleteRun: (id: string) => sendJson<{ deleted: string }>("DELETE", `/api/runs/${enc(id)}`),
+  clarify: (id: string, answer: string) => sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/clarify`, { answer }),
+  review: (id: string, claimId: string, state: ReviewState) =>
+    sendJson<Run>("PUT", `/api/runs/${enc(id)}/claims/${enc(claimId)}/review`, { state }),
+  rewriteMemo: (id: string) => sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/memo`),
+  chunk: (id: string) => request<ChunkResponse>(`/api/chunks/${enc(id)}`),
+  exportDocxUrl: (id: string) => `${API_URL}/api/runs/${enc(id)}/export.docx`,
 };

@@ -27,6 +27,11 @@ def index() -> Index:
     return _idx
 
 
+def reset_index() -> None:
+    global _idx
+    _idx = None
+
+
 def retrieve_extract(question: str, tag: str) -> dict:
     """Steps 1-4 (P2). Stops early when the brief asks for clarification."""
     t0 = time.time()

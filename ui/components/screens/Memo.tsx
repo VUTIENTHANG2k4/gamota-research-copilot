@@ -1,14 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useRun } from "@/components/RunProvider";
-import { Banner, Icon, LevelBadge, SectionLabel, SyntheticTag, toneClass } from "@/components/ui";
+import { Icon, LevelBadge, SectionLabel, SyntheticTag, toneClass } from "@/components/ui";
 import { EmptyState } from "@/components/states";
-import { Inline, Markdown } from "@/components/Markdown";
+import { Inline } from "@/components/Markdown";
+import { RunProgress } from "@/components/RunProgress";
+import { SyntheticNote } from "@/components/SyntheticNote";
 import { ClaimRef, Workspace } from "@/components/Workspace";
-import type { Level, Memo, MemoPoint, MemoSub } from "@/lib/api";
-import { LEVEL_ORDER, causeVi, levelVi } from "@/lib/text";
+import { api, ApiHttpError, type Level, type Memo, type MemoPoint, type MemoSub, type Run, type Verdict } from "@/lib/api";
+import { LEVEL_ORDER, causeVi, errorText, formatDateTime, levelVi } from "@/lib/text";
+import { useAbout } from "@/lib/useAbout";
 
 const BAND_CELL: Record<Level, string> = {
   "Chưa đủ căn cứ": "bg-danger-bg text-danger-text border-dashed border-danger-text",
@@ -105,7 +107,7 @@ function NotEnough({ sub }: { sub: MemoSub }) {
   );
 }
 
-function SubBlock({ sub, index }: { sub: MemoSub; index: number }) {
+function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; current?: Verdict }) {
   const refused = sub.verdict.level === "Chưa đủ căn cứ" || sub.refused_text !== null;
   return (
     <section className="border-t border-line pt-6" aria-labelledby={`m-${sub.id}`}>
@@ -115,6 +117,12 @@ function SubBlock({ sub, index }: { sub: MemoSub; index: number }) {
       </div>
       <h3 id={`m-${sub.id}`} className="mt-1 text-[18px] font-semibold leading-snug">{sub.text}</h3>
       <p className="mt-1 text-[14px] text-muted"><strong>Lý do:</strong> {sub.verdict.reason}</p>
+      {current && current.level !== sub.verdict.level && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border-2 border-warn-border bg-warn-bg p-2 text-[14px] font-medium text-warn-text">
+          <Icon name="alert" size={16} /> Sau quyết định duyệt, mức của câu hỏi con này đã đổi thành <LevelBadge level={current.level} />{" "}
+          (memo viết trước đó vẫn ghi mức trên).
+        </p>
+      )}
 
       <div className="mt-3 space-y-3">
         {refused ? (
@@ -198,24 +206,27 @@ function ListSection({ title, items, empty }: { title: string; items: string[]; 
   );
 }
 
-function MemoView({ memo }: { memo: Memo }) {
+function MemoView({ memo, run }: { memo: Memo; run: Run }) {
   const total = memo.subs.length;
   const refusedCount = memo.subs.filter((s) => s.verdict.level === "Chưa đủ căn cứ").length;
   const noPoints = memo.subs.filter((s) => s.verdict.level !== "Chưa đủ căn cứ" && s.points.length === 0).length;
   const note =
     memo.overall.level !== "Chưa đủ căn cứ" && refusedCount > 0
-      ? `${refusedCount}/${total} câu hỏi con ở trạng thái "Chưa đủ căn cứ" nhưng mức tổng thể chỉ tính các phần đã trả lời. Đây là lỗi đã biết (xem Giới hạn đã biết): mức tổng thể có thể cao hơn thực tế.${
+      ? `${refusedCount}/${total} câu hỏi con ở trạng thái "Chưa đủ căn cứ". Mức tổng thể chỉ tính các phần đã trả lời, nên hãy đọc nó cùng với các phần này: mức tổng thể có thể cao hơn thực tế.${
           noPoints > 0 ? ` Ngoài ra ${noPoints} câu hỏi con có mức nhưng chưa có câu kết luận nào.` : ""
         }`
       : undefined;
   const st = memo.stats;
+  const { confirmed, rejected } = run.review_summary;
 
   return (
     <article className="card space-y-6" aria-labelledby="memo-h">
       <header>
-        <SectionLabel>Memo · {memo.mode === "real" ? "chỉ tài liệu thật" : "chế độ thử bẫy (gồm SYNTHETIC)"}</SectionLabel>
+        <SectionLabel>Memo (bản ghi nhớ một trang)</SectionLabel>
         <h1 id="memo-h" className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">{memo.question}</h1>
-        <p className="mt-1 text-[14px] text-muted">Bản nháp do AI soạn, chưa có chuyên viên duyệt.</p>
+        <p className="mt-1 text-[14px] text-muted">
+          Bản do AI soạn từ các claim không bị loại, viết lúc {formatDateTime(run.memo_generated_at)}.
+        </p>
       </header>
 
       <section aria-labelledby="overall-h">
@@ -229,7 +240,9 @@ function MemoView({ memo }: { memo: Memo }) {
       <div>
         <SectionLabel>Kết luận theo câu hỏi con</SectionLabel>
         <div className="mt-4 space-y-6">
-          {memo.subs.map((s, i) => <SubBlock key={s.id} sub={s} index={i + 1} />)}
+          {memo.subs.map((s, i) => (
+            <SubBlock key={s.id} sub={s} index={i + 1} current={run.subs.find((x) => x.id === s.id)?.verdict} />
+          ))}
         </div>
       </div>
 
@@ -240,111 +253,215 @@ function MemoView({ memo }: { memo: Memo }) {
       <footer className="rounded-lg border border-ink/60 bg-subtle p-4 text-[14px]">
         <p className="font-semibold">Về memo này</p>
         <ul className="mt-1 list-disc space-y-1 pl-5">
-          <li>Memo do AI soạn và đã qua kiểm tra trích dẫn tự động (bằng code). Hãy mở đoạn gốc của từng claim trước khi dùng.</li>
           <li>
-            <strong>Bước duyệt của chuyên viên CHƯA được thực hiện.</strong> Số claim do chuyên viên xác nhận: 0.{" "}
-            {memo.analyst_review}
+            Memo do AI soạn và mọi claim trong đó đã qua kiểm tra trích dẫn tự động (bằng code). Hãy mở đoạn gốc của từng
+            claim trước khi dùng.
+          </li>
+          <li>
+            Duyệt của chuyên viên: <strong>{confirmed}</strong> claim đã xác nhận, <strong>{rejected}</strong> claim đã loại khỏi
+            memo.
           </li>
           {st && typeof st.demoted === "number" && st.demoted > 0 && (
             <li>
-              {st.demoted}/{st.llm_fact ?? "?"} câu bị code hạ xuống &quot;suy luận&quot;. Ở vòng kiểm thử P4, đánh giá độc lập cho
-              thấy bộ kiểm tra số này từng hạ nhầm nhiều câu đúng (lỗi đã biết); hãy đọc lại các câu này.
+              {st.demoted}/{st.llm_fact ?? "?"} câu AI viết như sự kiện nhưng không có claim đỡ nên bị code hạ xuống
+              &quot;suy luận&quot;; hãy đọc lại các câu này.
             </li>
           )}
-          <li>Bước duyệt claim của chuyên viên và xuất Word/PDF chưa được làm trong MVP.</li>
+          <li>Kho có tài liệu SYNTHETIC (tự soạn); chúng không bao giờ được dùng để kết luận.</li>
         </ul>
       </footer>
     </article>
   );
 }
 
-export default function MemoPage() {
-  const { run } = useRun();
-  const [mode, setMode] = useState<"real" | "test">("real");
+/** Elapsed time is counted from the moment this component appears (the rewrite request or the page opening). */
+function RewriteRunning() {
+  const [since] = useState(() => Date.now());
+  return (
+    <div className="no-print">
+      <RunProgress
+        stage="viết lại memo từ các claim không bị loại"
+        since={since}
+        title="Đang viết lại memo"
+        note="bản memo cũ bên dưới vẫn là bản trước đó"
+      />
+    </div>
+  );
+}
 
-  if (run.needs_clarification || run.subs.length === 0) {
+function MemoStatus({
+  run,
+  onRewrite,
+  busy,
+  startError,
+}: {
+  run: Run;
+  onRewrite: () => void;
+  busy: boolean;
+  startError: string | null;
+}) {
+  const st = run.memo_status;
+  if (st === "running") return <RewriteRunning />;
+
+  const canRewrite = run.subs.length > 0;
+  return (
+    <>
+      {st === "stale" && (
+        <section role="alert" className="rounded-xl border-2 border-warn-border bg-warn-bg p-5 text-warn-text">
+          <p className="flex items-center gap-2 text-[18px] font-bold">
+            <Icon name="alert" size={20} /> Memo chưa phản ánh các thay đổi duyệt gần nhất
+          </p>
+          <p className="mt-1 text-[15px]">
+            Bạn đã xác nhận hoặc loại claim sau khi memo này được viết ({run.review_summary.confirmed} xác nhận,{" "}
+            {run.review_summary.rejected} loại). Nội dung bên dưới có thể còn dựa trên claim đã bị loại. Viết lại memo để
+            cập nhật; việc này dùng model và mất khoảng một phút hoặc hơn.
+          </p>
+          {canRewrite && (
+            <button type="button" className="btn btn-primary no-print mt-3" onClick={onRewrite} disabled={busy}>
+              {busy ? "Đang gửi yêu cầu..." : "Viết lại memo"}
+            </button>
+          )}
+        </section>
+      )}
+      {st === "error" && (
+        <section role="alert" className="rounded-xl border-2 border-danger-text bg-danger-bg p-5 text-danger-text">
+          <p className="flex items-center gap-2 text-[18px] font-bold">
+            <Icon name="alert" size={20} /> Viết memo bị lỗi
+          </p>
+          <p className="mt-1 text-[14px]">Nội dung lỗi từ máy chủ, nguyên văn. Không có memo mới được tạo.</p>
+          <pre className="mt-1 whitespace-pre-wrap break-words rounded border border-danger-text/30 bg-surface p-3 font-mono text-[13px] text-ink">
+            {run.memo_error ?? "(máy chủ không kèm nội dung lỗi)"}
+          </pre>
+          {run.memo && (
+            <p className="mt-2 text-[14px] font-semibold">
+              Bản memo bên dưới là bản trước đó, có thể không còn khớp với các quyết định duyệt.
+            </p>
+          )}
+          {canRewrite && (
+            <button type="button" className="btn btn-primary no-print mt-3" onClick={onRewrite} disabled={busy}>
+              {busy ? "Đang gửi yêu cầu..." : "Thử viết lại memo"}
+            </button>
+          )}
+        </section>
+      )}
+      {st === "none" && !run.memo && canRewrite && (
+        <section className="no-print rounded-xl border-2 border-dashed border-ink/60 bg-surface p-5">
+          <p className="text-[17px] font-semibold">Lần chạy này chưa có memo</p>
+          <p className="text-[14px] text-muted">
+            Bạn có thể yêu cầu viết memo từ các claim không bị loại (dùng model, mất khoảng một phút hoặc hơn).
+          </p>
+          <button type="button" className="btn btn-primary mt-3" onClick={onRewrite} disabled={busy}>
+            {busy ? "Đang gửi yêu cầu..." : "Viết memo"}
+          </button>
+        </section>
+      )}
+      {startError && (
+        <p role="alert" className="no-print rounded-lg border border-danger-text/50 bg-danger-bg p-3 text-[14px] text-danger-text">
+          Không bắt đầu được việc viết memo: {startError}
+        </p>
+      )}
+    </>
+  );
+}
+
+function PrintLimitations() {
+  const about = useAbout();
+  return (
+    <section className="print-only mt-6 border-t border-ink pt-3 text-[12px]">
+      <p className="font-bold">Ghi chú giới hạn (bản MVP)</p>
+      {about ? (
+        <ul className="mt-1 list-disc pl-5">
+          {about.limitations.map((l, i) => <li key={i}>{l}</li>)}
+        </ul>
+      ) : (
+        <p className="mt-1">
+          Bản MVP: memo do AI soạn, cần mở đoạn gốc của từng claim trước khi dùng. Tài liệu SYNTHETIC là tài liệu tự soạn,
+          không dùng để kết luận. Danh sách giới hạn đầy đủ nằm ở trang Giới hạn đã biết.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export default function MemoPage() {
+  const { run, refresh } = useRun();
+  const [busy, setBusy] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  async function rewrite() {
+    setBusy(true);
+    setStartError(null);
+    try {
+      await api.rewriteMemo(run.id);
+      refresh();
+    } catch (e) {
+      setStartError(
+        e instanceof ApiHttpError && e.status === 429 ? `${e.detail} Hãy thử lại sau vài phút.` : errorText(e),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (run.status === "needs_clarification" || run.subs.length === 0) {
     return (
       <EmptyState title="Chưa có memo cho lần chạy này">
-        {run.needs_clarification
-          ? "Câu hỏi cần làm rõ nên chưa có nghiên cứu nào được chạy và memo chưa được viết."
-          : "API không trả về memo."}
+        {run.status === "needs_clarification"
+          ? "Câu hỏi cần làm rõ nên chưa có nghiên cứu nào được chạy và memo chưa được viết. Trả lời ở bước Brief."
+          : "Máy chủ không trả về kết quả nào cho lần chạy này."}
       </EmptyState>
     );
   }
 
-  const memo = mode === "real" ? run.memo_real : run.memo_test;
+  const memo = run.memo;
+  const stale = run.memo_status === "stale";
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="no-print flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
           <SectionLabel>Bước 4: Memo</SectionLabel>
           <p className="mt-1 text-muted">
-            Bấm vào mã claim bên cạnh mỗi câu để xem đoạn gốc. Chế độ chính chỉ dùng tài liệu thật; chế độ thử bẫy thêm tài
-            liệu SYNTHETIC để kiểm tra các cơ chế.
+            Bấm vào mã claim bên cạnh mỗi câu để xem đoạn gốc. Mức chắc chắn luôn đi kèm lý do; phần &quot;Chưa đủ căn cứ&quot;
+            được giữ nguyên thay vì đoán.
           </p>
         </div>
-        <div role="group" aria-label="Chọn chế độ memo" className="inline-flex rounded-lg border border-ink/60 bg-surface p-1">
-          {([
-            ["real", "Chính: chỉ tài liệu thật"],
-            ["test", "Thử bẫy: gồm SYNTHETIC"],
-          ] as const).map(([m, label]) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => setMode(m)}
-              className={`min-h-[44px] rounded-md px-3 text-[14px] font-semibold ${
-                mode === m ? "bg-accent text-white" : "text-ink hover:bg-subtle"
-              }`}
-            >
-              {label}
+        {memo && (
+          <div className="flex flex-wrap gap-2">
+            <a href={api.exportDocxUrl(run.id)} className="btn btn-secondary" download>
+              Tải Word
+            </a>
+            <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
+              Lưu thành PDF
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
-
-      {mode === "test" ? (
-        <Banner tone="warn" title="SYNTHETIC: memo thử bẫy, không phải thị trường thật">
-          Memo này dùng cả tài liệu SYNTHETIC do nhóm tự soạn để thử hệ thống. Không dùng nó để kết luận về thị trường
-          thật hay về Gamota thật. Banner này luôn hiển thị ở chế độ này.
-        </Banner>
-      ) : (
-        <Banner tone="neutral" title="Memo chính: chỉ dùng tài liệu thật">
-          Tài liệu SYNTHETIC bị loại ở chế độ này. Kết quả là bản đã lưu, chưa có chuyên viên duyệt; nhiều câu hỏi con vẫn
-          &quot;Chưa đủ căn cứ&quot;.
-        </Banner>
+      {memo && stale && (
+        <p className="no-print text-[13px] text-muted">
+          Tệp Word của memo chưa cập nhật mang sẵn cảnh báo rằng memo chưa phản ánh các thay đổi duyệt gần nhất; bản in PDF
+          cũng giữ cảnh báo này.
+        </p>
       )}
+
+      <div className="no-print"><SyntheticNote compact /></div>
+
+      <MemoStatus run={run} onRewrite={rewrite} busy={busy} startError={startError} />
 
       <Workspace run={run}>
         <div className="space-y-6">
           {memo ? (
-            <MemoView memo={memo} />
+            <>
+              <MemoView memo={memo} run={run} />
+              <PrintLimitations />
+            </>
           ) : (
-            <EmptyState title="Không có memo ở chế độ này">API không trả về memo cho chế độ đã chọn.</EmptyState>
+            run.memo_status !== "running" && (
+              <EmptyState title="Chưa có memo">
+                Máy chủ không trả về memo cho lần chạy này; không có nội dung thay thế được hiển thị.
+              </EmptyState>
+            )
           )}
-
-          <section className="card" aria-labelledby="baseline-h">
-            <SectionLabel>So sánh</SectionLabel>
-            <h2 id="baseline-h" className="sr-only">Câu trả lời baseline</h2>
-            {run.baseline ? (
-              <details className="mt-1">
-                <summary className="cursor-pointer text-[16px] font-semibold">
-                  Câu trả lời trực tiếp của LLM, không có nguồn kiểm chứng
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <Banner tone="danger" title="Không dùng làm căn cứ">
-                    Đây là câu trả lời của LLM không qua kho tài liệu: không có claim ID, không có đoạn gốc. Con số trong
-                    đó không truy vết được; đánh giá kiểm thử ghi nhận nhiều số liệu không có căn cứ và có chỗ sai so với
-                    kho (xem <Link href="/test-results" className="font-semibold underline">Kết quả kiểm thử</Link>, T8).
-                  </Banner>
-                  <Markdown text={run.baseline.answer} className="rounded-lg border border-line bg-subtle p-4" />
-                </div>
-              </details>
-            ) : (
-              <p className="mt-1 text-muted">Chưa có câu trả lời baseline cho câu hỏi này (chỉ Q1 đến Q5 có).</p>
-            )}
-          </section>
         </div>
       </Workspace>
     </div>

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRun } from "@/components/RunProvider";
-import { SyntheticTag, ClaimChip, LevelBadge, SectionLabel, Icon } from "@/components/ui";
+import { Banner, SyntheticTag, ClaimChip, LevelBadge, SectionLabel, Icon } from "@/components/ui";
 import { EmptyState } from "@/components/states";
+import { SyntheticNote } from "@/components/SyntheticNote";
 import { Workspace, useClaimSelection } from "@/components/Workspace";
 import type { Claim, RejectedClaim, Sub } from "@/lib/api";
 import { claimTypeVi, dateOrUnknown, rejectionReasonVi } from "@/lib/text";
@@ -17,11 +19,15 @@ function ClaimRow({ claim }: { claim: Claim }) {
         onClick={() => select(claim.claim_id)}
         aria-pressed={selected}
         className={`w-full cursor-pointer rounded-lg border p-3 text-left ${
-          selected ? "border-ink bg-subtle shadow-[inset_4px_0_0_var(--color-ink)]" : "border-line bg-surface hover:border-accent"
+          selected
+            ? "border-ink bg-subtle shadow-[inset_4px_0_0_var(--color-ink)]"
+            : claim.review === "rejected"
+              ? "border-danger-text/60 bg-danger-bg/40 hover:border-danger-text"
+              : "border-line bg-surface hover:border-accent"
         }`}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <ClaimChip id={claim.claim_id} grade={claim.grade} selected={selected} />
+          <ClaimChip id={claim.claim_id} grade={claim.grade} review={claim.review} selected={selected} />
           {claim.is_synthetic && <SyntheticTag />}
           {claim.claim_type !== "fact" && (
             <span className="rounded border border-dashed border-ink px-1.5 font-mono text-[11px] uppercase tracking-[0.06em]">
@@ -43,7 +49,7 @@ function RejectedRow({ c }: { c: RejectedClaim }) {
   return (
     <li className="rounded-lg border border-danger-text/50 bg-danger-bg p-3 text-danger-text">
       <div className="flex flex-wrap items-center gap-2">
-        <ClaimChip id="claim bị loại" rejected />
+        <ClaimChip id="claim bị loại" failedCheck />
         {c.source_id && <span className="font-mono text-[13px]">{c.source_id}</span>}
         {c.is_synthetic && <SyntheticTag />}
       </div>
@@ -61,29 +67,33 @@ function RejectedRow({ c }: { c: RejectedClaim }) {
 }
 
 function SubSection({ sub }: { sub: Sub }) {
+  const { openedVerdicts } = useRun();
+  const opened = openedVerdicts[sub.id];
+  const moved = opened && opened.level !== sub.verdict.level;
+  const rejectedByReview = sub.claims.filter((c) => c.review === "rejected").length;
   return (
     <section className="card" aria-labelledby={`sub-${sub.id}`}>
       <div className="flex flex-wrap items-baseline gap-x-3">
         <span className="label-mono">{sub.id}</span>
         <span className="text-[13px] text-muted">
-          đã truy xuất {sub.retrieved.length} đoạn · {sub.claims.length} claim đạt · {sub.rejected_claims.length} claim bị loại
+          đã truy xuất {sub.retrieved.length} đoạn · {sub.claims.length} claim đạt kiểm tra trích dẫn
+          {rejectedByReview > 0 && <> ({rejectedByReview} đã loại khỏi memo)</>} · {sub.rejected_claims.length} claim bị loại ở bước kiểm tra
         </span>
       </div>
       <h2 id={`sub-${sub.id}`} className="mt-1 text-[18px] font-semibold leading-snug">{sub.text}</h2>
 
-      <div className="mt-3 space-y-1.5 text-[14px]">
+      <div className="mt-3 space-y-2 text-[14px]">
         <p className="flex flex-wrap items-center gap-2">
-          <LevelBadge level={sub.verdict_real_only.level} />
-          <span><strong>Chỉ tài liệu thật:</strong> {sub.verdict_real_only.reason}</span>
+          <LevelBadge level={sub.verdict.level} />
+          <span><strong>Vì sao:</strong> {sub.verdict.reason}</span>
         </p>
-        {JSON.stringify(sub.verdict_with_synthetic) !== JSON.stringify(sub.verdict_real_only) && (
-          <p className="flex flex-wrap items-center gap-2">
-            <LevelBadge level={sub.verdict_with_synthetic.level} />
-            <span>
-              <SyntheticTag className="mr-1" />
-              <strong>Chế độ thử bẫy (gồm SYNTHETIC):</strong> {sub.verdict_with_synthetic.reason}
-            </span>
-          </p>
+        {moved && (
+          <div role="status" className="rounded-lg border-2 border-warn-border bg-warn-bg p-3 text-warn-text">
+            <p className="font-semibold">Mức chắc chắn đã đổi sau quyết định duyệt của bạn (code tính lại)</p>
+            <p className="mt-1 flex flex-wrap items-center gap-1.5">
+              Khi mở trang: <LevelBadge level={opened.level} /> <span aria-hidden>→</span> hiện tại: <LevelBadge level={sub.verdict.level} />
+            </p>
+          </div>
         )}
       </div>
 
@@ -117,12 +127,12 @@ function SubSection({ sub }: { sub: Sub }) {
 export default function EvidencePage() {
   const { run } = useRun();
 
-  if (run.needs_clarification || run.subs.length === 0) {
+  if (run.status === "needs_clarification" || run.subs.length === 0) {
     return (
       <EmptyState title="Chưa có bằng chứng cho lần chạy này">
-        {run.needs_clarification
-          ? "Câu hỏi cần làm rõ nên chưa truy xuất tài liệu nào."
-          : "API không trả về câu hỏi con nào."}
+        {run.status === "needs_clarification"
+          ? "Câu hỏi cần làm rõ nên chưa truy xuất tài liệu nào. Trả lời ở bước Brief."
+          : "Máy chủ không trả về câu hỏi con nào."}
       </EmptyState>
     );
   }
@@ -130,6 +140,7 @@ export default function EvidencePage() {
   const valid = run.subs.flatMap((s) => s.claims);
   const rejected = run.subs.reduce((n, s) => n + s.rejected_claims.length, 0);
   const synth = valid.filter((c) => c.is_synthetic).length;
+  const { confirmed, rejected: removed } = run.review_summary;
 
   return (
     <div className="space-y-6">
@@ -138,17 +149,29 @@ export default function EvidencePage() {
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">Kho bằng chứng</h1>
         <p className="mt-2 text-muted">
           Mỗi <strong>claim</strong> (một khẳng định trích từ tài liệu) kèm hạng nguồn A đến D. Bấm vào claim để xem đoạn
-          gốc bên cạnh. Trạng thái duy nhất mà hệ thống tự kiểm tra là &quot;đạt kiểm tra trích dẫn&quot;; chưa có chuyên viên
-          nào duyệt.
+          gốc bên cạnh, rồi <strong>Xác nhận</strong> hoặc <strong>Loại khỏi memo</strong>. Mức chắc chắn của từng câu hỏi
+          con được code tính lại ngay sau mỗi quyết định; memo chỉ đổi khi bạn viết lại memo.
         </p>
         <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
-          <span><strong className="tabular">{valid.length}</strong> claim đạt kiểm tra</span>
+          <span><strong className="tabular">{valid.length}</strong> claim đạt kiểm tra trích dẫn</span>
           <span className="inline-flex items-center gap-1 font-semibold text-danger-text">
-            <Icon name="x" size={14} /> <span className="tabular">{rejected}</span> claim bị loại
+            <Icon name="x" size={14} /> <span className="tabular">{rejected}</span> claim bị loại ở bước kiểm tra
           </span>
           <span><strong className="tabular">{synth}</strong> claim từ tài liệu SYNTHETIC</span>
         </p>
+        <p className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[14px]" aria-label="Tóm tắt duyệt">
+          <span className="font-semibold text-ok-text"><span className="tabular">{confirmed}</span> claim đã xác nhận</span>
+          <span className="font-semibold text-danger-text"><span className="tabular">{removed}</span> claim đã loại khỏi memo</span>
+        </p>
       </div>
+
+      <SyntheticNote />
+
+      {run.memo_status === "stale" && (
+        <Banner tone="warn" title="Memo chưa phản ánh các thay đổi duyệt gần nhất">
+          <Link href={`/runs/${encodeURIComponent(run.id)}/memo`} className="font-semibold underline">Đến bước Memo</Link> để viết lại.
+        </Banner>
+      )}
 
       <Workspace run={run}>
         <div className="space-y-6">

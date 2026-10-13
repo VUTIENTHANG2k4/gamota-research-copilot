@@ -1,4 +1,4 @@
-import type { Claim, Grade, Level, Run } from "./api";
+import { ApiHttpError, ApiUnreachableError, type Claim, type Grade, type Level, type MemoStatus, type Run, type RunStatus } from "./api";
 
 export const LEVEL_ORDER: Level[] = ["Chưa đủ căn cứ", "Low", "Medium", "High"];
 
@@ -90,12 +90,38 @@ export function splitBullets(text: string): string[] {
   return parts;
 }
 
-export function formatSeconds(s: number): string {
-  return `${s.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giây`;
+export const RUN_STATUS_VI: Record<RunStatus, string> = {
+  queued: "Đang chờ",
+  running: "Đang chạy",
+  done: "Hoàn tất",
+  error: "Lỗi",
+  needs_clarification: "Cần làm rõ câu hỏi",
+};
+
+export const MEMO_STATUS_VI: Record<MemoStatus, string> = {
+  none: "Chưa có memo",
+  fresh: "Memo mới nhất",
+  stale: "Memo chưa phản ánh duyệt gần nhất",
+  running: "Đang viết lại memo",
+  error: "Viết memo bị lỗi",
+};
+
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "không ghi";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "không ghi";
+  return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export const TIMING_LABELS: Record<string, string> = {
-  brief_s: "Soạn brief",
-  extract_verify_s: "Truy xuất, trích claim, kiểm tra trích dẫn",
-  grade_conflict_s: "Chấm hạng và đối soát mâu thuẫn",
-};
+/** "m:ss" from a number of seconds. */
+export function formatElapsed(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Plain Vietnamese text for an error thrown by the API client; server messages are kept verbatim. */
+export function errorText(e: unknown): string {
+  if (e instanceof ApiUnreachableError) return "Không kết nối được máy chủ. Thao tác chưa được thực hiện.";
+  if (e instanceof ApiHttpError) return `${e.detail} (HTTP ${e.status})`;
+  return "Lỗi không xác định.";
+}

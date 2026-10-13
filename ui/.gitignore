@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# The repo-root .gitignore ignores "runs/" (model run logs); the UI route app/runs/ must stay tracked.
+!/app/runs/

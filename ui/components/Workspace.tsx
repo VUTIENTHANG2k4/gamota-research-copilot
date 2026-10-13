@@ -33,9 +33,9 @@ export function Workspace({ run, children }: { run: Run; children: ReactNode }) 
 
   return (
     <SelCtx.Provider value={{ selectedId, select, index }}>
-      <div className="grid gap-6 min-[1060px]:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] min-[1060px]:items-start">
+      <div className="workspace-grid grid gap-6 min-[1060px]:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] min-[1060px]:items-start">
         <div className="min-w-0">{children}</div>
-        <div ref={panelRef} className="min-w-0 scroll-mt-4 min-[1060px]:sticky min-[1060px]:top-4 min-[1060px]:max-h-[calc(100vh-2rem)] min-[1060px]:overflow-y-auto">
+        <div ref={panelRef} className="no-print min-w-0 scroll-mt-4 min-[1060px]:sticky min-[1060px]:top-4 min-[1060px]:max-h-[calc(100vh-2rem)] min-[1060px]:overflow-y-auto">
           <SourcePanel claim={claim} run={run} onClear={() => setSelectedId(null)} />
         </div>
       </div>
@@ -59,10 +59,10 @@ export function ClaimRef({ id }: { id: string }) {
       type="button"
       onClick={() => select(id)}
       aria-pressed={selectedId === id}
-      aria-label={`Mở đoạn gốc của ${id}, hạng ${claim.grade}`}
+      aria-label={`Mở đoạn gốc của ${id}, hạng ${claim.grade}${claim.review === "rejected" ? ", đã loại khỏi memo" : claim.review === "confirmed" ? ", đã xác nhận" : ""}`}
       className="cursor-pointer rounded-full text-left"
     >
-      <ClaimChip id={id} grade={claim.grade} selected={selectedId === id} />
+      <ClaimChip id={id} grade={claim.grade} review={claim.review} selected={selectedId === id} />
     </button>
   );
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Grade, Level } from "@/lib/api";
+import type { Grade, Level, ReviewState } from "@/lib/api";
 import { GRADE_TONE, levelVi } from "@/lib/text";
 
 /* Stroke SVG icons (no emoji). All are decorative: the adjacent text carries the meaning. */
@@ -70,23 +70,31 @@ export function GradeBadge({ grade, className = "" }: { grade: Grade; className?
   );
 }
 
-/** Claim chip: mono ID + grade + review state. `selected` inverts to ink fill with white text. */
+/**
+ * Claim chip: mono ID + grade + state. `review` is the analyst decision; `failedCheck` marks a claim that did not
+ * pass the automatic citation check. `selected` inverts to ink fill with white text.
+ */
 export function ClaimChip({
   id,
   grade,
+  review = "none",
   selected = false,
-  rejected = false,
+  failedCheck = false,
 }: {
   id: string;
   grade?: Grade;
+  review?: ReviewState;
   selected?: boolean;
-  rejected?: boolean;
+  failedCheck?: boolean;
 }) {
+  const bad = failedCheck || review === "rejected";
   const base = selected
     ? "bg-ink text-white border-ink"
-    : rejected
+    : bad
       ? TONE.danger
-      : "bg-surface text-ink border-line";
+      : review === "confirmed"
+        ? TONE.ok
+        : "bg-surface text-ink border-line";
   const gradeCls = selected ? "bg-white text-ink" : grade ? TONE[GRADE_TONE[grade]] : "";
   return (
     <span className={`inline-flex flex-wrap items-center gap-1.5 rounded-full border px-2 py-0.5 text-[13px] ${base}`}>
@@ -94,9 +102,13 @@ export function ClaimChip({
       {grade && (
         <span className={`rounded-full border px-1.5 text-[12px] font-semibold ${gradeCls}`}>Hạng {grade}</span>
       )}
-      {rejected ? (
+      {bad ? (
         <span className="inline-flex items-center gap-0.5 font-medium">
-          <Icon name="x" size={13} /> đã loại
+          <Icon name="x" size={13} /> {failedCheck ? "đã loại" : "đã loại khỏi memo"}
+        </span>
+      ) : review === "confirmed" ? (
+        <span className="inline-flex items-center gap-0.5 font-medium">
+          <Icon name="check" size={13} /> đã xác nhận
         </span>
       ) : (
         <span className="inline-flex items-center gap-0.5">

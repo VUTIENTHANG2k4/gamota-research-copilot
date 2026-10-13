@@ -80,5 +80,17 @@ def ingest() -> dict:
     return stats
 
 
+def ensure_ingested() -> int:
+    """Load the corpus into an empty database (first deploy). Returns the number of chunks."""
+    with db.connect() as conn:
+        db.init_schema(conn)
+        n = conn.execute("SELECT count(*) FROM chunks").fetchone()[0]
+    if n == 0:
+        n = ingest()["chunks"]
+        from app import pipeline
+        pipeline.reset_index()
+    return n
+
+
 if __name__ == "__main__":
     print(ingest())

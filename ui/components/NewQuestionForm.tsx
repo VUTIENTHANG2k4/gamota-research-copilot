@@ -1,141 +1,141 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiHttpError, ApiUnreachableError } from "@/lib/api";
 import { SectionLabel } from "./ui";
+import { RunProgress } from "./RunProgress";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "starting" }
-  | { kind: "running"; jobId: string; key: string; stage: string; startedAt: number }
-  | { kind: "failed"; title: string; text: string; jobError: boolean };
+  | { kind: "running"; id: string; stage: string; since: number }
+  | { kind: "failed"; title: string; text: string; runId?: string };
 
 const MIN = 5;
 const MAX = 400;
 const POLL_MS = 3000;
 
-export function NewQuestionForm() {
+function startErrorText(err: unknown): { title: string; text: string } {
+  if (err instanceof ApiUnreachableError) {
+    return {
+      title: "Không kết nối được máy chủ",
+      text: "Máy chủ không phản hồi nên câu hỏi chưa được gửi. Hãy thử lại sau.",
+    };
+  }
+  if (err instanceof ApiHttpError) {
+    if (err.status === 429) return { title: "Hệ thống đang bận", text: err.detail };
+    if (err.status === 503) return { title: "Kho tài liệu chưa sẵn sàng", text: err.detail };
+    if (err.status === 422) return { title: "Câu hỏi không hợp lệ", text: `Câu hỏi cần từ ${MIN} đến ${MAX} ký tự.` };
+    return { title: "Máy chủ từ chối câu hỏi", text: `${err.detail} (HTTP ${err.status})` };
+  }
+  return { title: "Không gửi được câu hỏi", text: "Lỗi không xác định." };
+}
+
+export function NewQuestionForm({
+  blockedReason,
+  onStarted,
+}: {
+  /** When set, the form is disabled and this text says why (document store not ready). */
+  blockedReason?: string;
+  onStarted?: () => void;
+}) {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [elapsed, setElapsed] = useState(0);
 
   const len = question.trim().length;
   const valid = len >= MIN && len <= MAX;
   const busy = phase.kind === "starting" || phase.kind === "running";
+  const runId = phase.kind === "running" ? phase.id : null;
 
-  const jobId = phase.kind === "running" ? phase.jobId : null;
-  const jobKey = phase.kind === "running" ? phase.key : null;
-  const startedAt = phase.kind === "running" ? phase.startedAt : 0;
-
-  // Poll the job until it is done or has failed. The error text is shown exactly as the API returns it.
+  // Poll the new run; when it leaves queued/running (done, error, needs clarification) open its page.
   useEffect(() => {
-    if (!jobId) return;
+    if (!runId) return;
     let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = async () => {
+    const timer = setInterval(async () => {
       try {
-        const job = await api.job(jobId);
+        const r = await api.run(runId);
         if (!alive) return;
-        if (job.status === "done") {
-          router.push(`/runs/${encodeURIComponent(jobKey ?? job.key)}`);
-          return;
+        if (r.status === "queued" || r.status === "running") {
+          setPhase((p) => (p.kind === "running" ? { ...p, stage: r.stage } : p));
+        } else {
+          router.push(`/runs/${encodeURIComponent(runId)}`);
         }
-        if (job.status === "error") {
-          setPhase({ kind: "failed", title: "Lần chạy trực tiếp kết thúc bằng lỗi", text: job.error ?? "(API không kèm nội dung lỗi)", jobError: true });
-          return;
-        }
-        setPhase((p) => (p.kind === "running" ? { ...p, stage: job.stage } : p));
       } catch (e) {
         if (!alive) return;
-        const text =
-          e instanceof ApiUnreachableError
-            ? "Mất kết nối tới máy chủ API khi đang chờ kết quả. Lần chạy có thể vẫn đang chạy trên backend nhưng giao diện không theo dõi được nữa."
-            : e instanceof ApiHttpError && e.status === 404
-              ? "Máy chủ không còn nhớ tác vụ này (backend có thể đã khởi động lại). Không có kết quả."
-              : e instanceof ApiHttpError
-                ? `HTTP ${e.status}: ${e.detail}`
-                : "Lỗi không xác định khi theo dõi tác vụ.";
-        setPhase({ kind: "failed", title: "Không theo dõi được lần chạy", text, jobError: false });
-        return;
+        if (e instanceof ApiUnreachableError) return; // keep trying; the run continues on the server
+        setPhase({
+          kind: "failed",
+          title: "Không theo dõi được lần chạy",
+          text: e instanceof ApiHttpError ? `${e.detail} (HTTP ${e.status})` : "Lỗi không xác định.",
+        });
       }
-      timer = setTimeout(tick, POLL_MS);
-    };
-    timer = setTimeout(tick, 1000);
-    const clock = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    }, POLL_MS);
     return () => {
       alive = false;
-      clearTimeout(timer);
-      clearInterval(clock);
+      clearInterval(timer);
     };
-  }, [jobId, jobKey, startedAt, router]);
+  }, [runId, router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid || busy) return;
+    if (!valid || busy || blockedReason) return;
     setPhase({ kind: "starting" });
-    setElapsed(0);
     try {
       const r = await api.startRun(question.trim());
-      setPhase({ kind: "running", jobId: r.job_id, key: r.key, stage: "bắt đầu", startedAt: Date.now() });
+      setPhase({ kind: "running", id: r.id, stage: "chờ xử lý", since: Date.now() });
+      onStarted?.();
     } catch (err) {
-      const text =
-        err instanceof ApiUnreachableError
-          ? "Không kết nối được máy chủ API. Khởi động backend từ thư mục gốc repo: .venv\\Scripts\\python -m uvicorn api.main:app --port 8000 (và docker compose up -d cho PostgreSQL)."
-          : err instanceof ApiHttpError
-            ? `HTTP ${err.status}: ${err.detail}`
-            : "Lỗi không xác định khi gửi câu hỏi.";
-      setPhase({ kind: "failed", title: "Không bắt đầu được lần chạy", text, jobError: false });
+      setPhase({ kind: "failed", ...startErrorText(err) });
     }
   }
 
-  const mm = Math.floor(elapsed / 60);
-  const ss = String(elapsed % 60).padStart(2, "0");
-
   return (
     <section className="card" aria-labelledby="new-h">
-      <SectionLabel>Câu hỏi mới (chạy trực tiếp)</SectionLabel>
-      <h2 id="new-h" className="mt-1 text-xl font-semibold">Nhập câu hỏi của bạn</h2>
-      <p className="mt-2 text-[14px] text-muted">
-        Chạy trực tiếp mất vài phút và dùng model miễn phí có giới hạn lượt gọi mỗi ngày, nên có thể kết thúc bằng lỗi
-        (ví dụ hết quota). Khi đó giao diện hiện đúng nội dung lỗi và không tạo kết quả thay thế. Model miễn phí ghi log sử
-        dụng: chỉ nhập câu hỏi về dữ liệu công khai, không nhập dữ liệu nội bộ hay dữ liệu cá nhân.
+      <SectionLabel>Câu hỏi mới</SectionLabel>
+      <h1 id="new-h" className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">
+        Đặt một câu hỏi nghiên cứu thị trường game
+      </h1>
+      <p className="mt-2 text-muted">
+        Hệ thống tìm trong kho 30 tài liệu cố định, trích các khẳng định (claim) kèm đoạn gốc, chấm hạng nguồn A đến D, đối
+        soát mâu thuẫn rồi soạn memo một trang với mức chắc chắn và lý do. Khi chưa đủ căn cứ, memo ghi rõ &quot;Chưa đủ căn
+        cứ&quot; thay vì đoán.
       </p>
       <form onSubmit={submit} className="mt-4">
-        <label htmlFor="q" className="block text-[14px] font-semibold">Câu hỏi nghiên cứu</label>
+        <label htmlFor="q" className="block text-[14px] font-semibold">Câu hỏi của bạn</label>
         <textarea
           id="q"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          disabled={busy}
-          rows={4}
+          disabled={busy || !!blockedReason}
+          rows={3}
           maxLength={MAX + 100}
           aria-describedby="q-hint"
           className="mt-1 w-full resize-y rounded-lg border border-ink/50 bg-surface p-3 text-[15px] disabled:bg-subtle"
-          placeholder="Ví dụ: Thị trường game casual tại Việt Nam năm 2025 có quy mô bao nhiêu?"
+          placeholder="Ví dụ: Giới hạn thời gian chơi game của người dưới 18 tuổi theo quy định hiện hành là bao nhiêu?"
         />
         <p id="q-hint" className={`mt-1 text-[13px] ${len > 0 && !valid ? "font-semibold text-danger-text" : "text-muted"}`}>
-          {len}/{MAX} ký tự. Cần từ {MIN} đến {MAX} ký tự.
+          {len}/{MAX} ký tự. Cần từ {MIN} đến {MAX} ký tự. Chỉ nhập câu hỏi về thông tin công khai: model miễn phí ghi log sử
+          dụng, không nhập dữ liệu nội bộ hay dữ liệu cá nhân.
         </p>
-        <button type="submit" disabled={!valid || busy} className="btn btn-primary mt-3">
+        <button type="submit" disabled={!valid || busy || !!blockedReason} className="btn btn-primary mt-3">
           {busy ? "Đang chạy..." : "Chạy nghiên cứu"}
         </button>
+        {blockedReason && <p className="mt-2 text-[14px] font-medium text-warn-text">{blockedReason}</p>}
       </form>
 
-      {phase.kind === "starting" && (
-        <p role="status" className="mt-4 text-muted">Đang gửi câu hỏi tới máy chủ...</p>
-      )}
+      {phase.kind === "starting" && <p role="status" className="mt-4 text-muted">Đang gửi câu hỏi tới máy chủ...</p>}
 
       {phase.kind === "running" && (
-        <div role="status" aria-live="polite" className="mt-4 rounded-lg border border-line bg-subtle p-4">
-          <p className="flex items-center gap-2 font-semibold">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-accent" aria-hidden />
-            Đang chạy: {phase.stage}
-          </p>
-          <p className="mt-1 text-[14px] text-muted">
-            Đã chờ {mm}:{ss}. Một lần chạy thường mất vài phút; đừng đóng trang này. Mã tác vụ{" "}
-            <span className="font-mono">{phase.jobId}</span>.
+        <div className="mt-4">
+          <RunProgress stage={phase.stage} since={phase.since} title="Đang nghiên cứu câu hỏi của bạn" />
+          <p className="mt-2 text-[14px]">
+            <Link href={`/runs/${encodeURIComponent(phase.id)}`} className="font-semibold text-accent underline">
+              Mở trang của lần chạy này
+            </Link>{" "}
+            (trang tự mở khi xong).
           </p>
         </div>
       )}
@@ -143,16 +143,9 @@ export function NewQuestionForm() {
       {phase.kind === "failed" && (
         <div role="alert" className="mt-4 rounded-lg border border-danger-text/50 bg-danger-bg p-4 text-danger-text">
           <p className="font-semibold">{phase.title}</p>
-          <p className="mt-1 text-[13px]">Nội dung lỗi từ máy chủ, nguyên văn:</p>
           <pre className="mt-1 whitespace-pre-wrap break-words rounded border border-danger-text/30 bg-surface p-3 font-mono text-[13px] text-ink">
             {phase.text}
           </pre>
-          {phase.jobError && (
-            <p className="mt-2">
-              Chạy trực tiếp cần quota của model miễn phí. Nếu quota đã hết hoặc model quá tải, lần chạy sẽ kết thúc bằng
-              lỗi như trên và không có kết quả nào được tạo. Bạn vẫn xem được các câu hỏi đã lưu ở cột bên cạnh.
-            </p>
-          )}
           <button type="button" className="btn btn-secondary mt-3 bg-surface" onClick={() => setPhase({ kind: "idle" })}>
             Đóng thông báo
           </button>

@@ -1,8 +1,9 @@
 .env
-runs/
+/runs/
 __pycache__/
 node_modules/
 .next/
 *.pyc
 .venv/
 runs_p4_round*.log
+runs_api*.log

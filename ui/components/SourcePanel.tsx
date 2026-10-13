@@ -4,7 +4,8 @@ import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { api, ApiHttpError, ApiUnreachableError, type Claim, type Run } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { GRADE_COMPONENTS, claimTypeVi, dateOrUnknown, sourceTypeVi } from "@/lib/text";
-import { GradeBadge, Icon, SyntheticTag, SectionLabel } from "./ui";
+import { GradeBadge, Icon, LevelBadge, SyntheticTag, SectionLabel } from "./ui";
+import { useRun } from "./RunProvider";
 import { Loading } from "./states";
 
 const NUMBER_RE = /\d+(?:[.,]\d+)*(?:\s?%)?/g;
@@ -97,6 +98,87 @@ function Quote({ chunkText, passage }: { chunkText: string | null; passage: stri
   );
 }
 
+function ReviewRow({ claim }: { claim: Claim }) {
+  const { run, review, reviewBusy, reviewError, lastDecision } = useRun();
+  const state = claim.review;
+  const decision = lastDecision && lastDecision.claimId === claim.claim_id ? lastDecision : null;
+  const decisionWord = (st: string) => (st === "confirmed" ? "xác nhận" : st === "rejected" ? "loại khỏi memo" : "hoàn tác");
+
+  return (
+    <div className="rounded-lg border-2 border-ink/70 p-4" aria-labelledby={`rv-${claim.claim_id}`}>
+      <p id={`rv-${claim.claim_id}`} className="label-mono">Duyệt của chuyên viên</p>
+      <p className="mt-1 text-[15px] font-semibold">
+        {state === "confirmed" && "Bạn đã xác nhận claim này."}
+        {state === "rejected" && "Claim này đã bị loại khỏi memo."}
+        {state === "none" && "Chưa duyệt claim này."}
+      </p>
+      {state === "rejected" && (
+        <p className="mt-1 text-[14px] text-danger-text">
+          Claim vẫn được hiển thị để bạn thấy, nhưng không còn được tính vào mức chắc chắn và sẽ không có trong memo viết lại.
+        </p>
+      )}
+      {claim.is_synthetic && (
+        <p className="mt-1 text-[14px] text-warn-text">
+          Claim SYNTHETIC không bao giờ được tính vào kết luận, dù xác nhận hay loại.
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-primary" disabled={reviewBusy || state === "confirmed"} onClick={() => review(claim.claim_id, "confirmed")}>
+          <Icon name="check" size={16} /> Xác nhận
+        </button>
+        <button
+          type="button"
+          className="btn border-danger-text bg-surface text-danger-text hover:bg-danger-bg disabled:opacity-50"
+          disabled={reviewBusy || state === "rejected"}
+          onClick={() => review(claim.claim_id, "rejected")}
+        >
+          <Icon name="x" size={16} /> Loại khỏi memo
+        </button>
+        <button type="button" className="btn btn-secondary" disabled={reviewBusy || state === "none"} onClick={() => review(claim.claim_id, "none")}>
+          Hoàn tác
+        </button>
+      </div>
+      {reviewBusy && <p role="status" className="mt-2 text-[14px] text-muted">Đang lưu quyết định...</p>}
+      {reviewError && (
+        <p role="alert" className="mt-2 rounded border border-danger-text/50 bg-danger-bg p-2 text-[14px] text-danger-text">
+          Không lưu được quyết định: {reviewError}
+        </p>
+      )}
+      {decision && !reviewBusy && (
+        <div role="status" className="mt-3 rounded-lg border border-line bg-subtle p-3 text-[14px]">
+          <p className="font-semibold">Đã lưu: {decisionWord(decision.state)}.</p>
+          {decision.changes.length === 0 ? (
+            <p>Mức chắc chắn của các câu hỏi con không đổi (máy chủ đã tính lại).</p>
+          ) : (
+            <ul className="mt-1 space-y-2">
+              {decision.changes.map((c) => (
+                <li key={c.subId}>
+                  <p className="font-semibold">
+                    Mức chắc chắn của <span className="font-mono">{c.subId}</span> đã đổi:
+                  </p>
+                  <p className="flex flex-wrap items-center gap-1.5">
+                    <LevelBadge level={c.from.level} /> <span aria-hidden>→</span> <LevelBadge level={c.to.level} />
+                  </p>
+                  <p className="text-muted">Lý do mới: {c.to.reason}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {run.memo_status === "stale" && (
+            <p className="mt-2 font-medium text-warn-text">
+              Memo chưa phản ánh quyết định này. Vào bước Memo và bấm &quot;Viết lại memo&quot;.
+            </p>
+          )}
+        </div>
+      )}
+      <p className="mt-2 text-[13px] text-muted">
+        Tổng cộng lần chạy này: {run.review_summary.confirmed} claim đã xác nhận, {run.review_summary.rejected} claim đã loại.
+        Mức chắc chắn hiện tại do code tính lại sau mỗi quyết định (không do AI).
+      </p>
+    </div>
+  );
+}
+
 function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
   const { state, reload } = useApi(() => api.chunk(claim.chunk_id), claim.chunk_id);
   const src = claim.source;
@@ -138,6 +220,16 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-[17px] font-medium">{claim.claim_id}</span>
           <GradeBadge grade={claim.grade} />
+          {claim.review === "rejected" && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-danger-text/50 bg-danger-bg px-2 py-0.5 text-[13px] font-semibold text-danger-text">
+              <Icon name="x" size={13} /> đã loại khỏi memo
+            </span>
+          )}
+          {claim.review === "confirmed" && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-ok-text/40 bg-ok-bg px-2 py-0.5 text-[13px] font-semibold text-ok-text">
+              <Icon name="check" size={13} /> đã xác nhận
+            </span>
+          )}
           {claim.is_synthetic && <SyntheticTag />}
           {claim.claim_type !== "fact" && (
             <span className="rounded border border-dashed border-ink px-1.5 font-mono text-[11px] uppercase tracking-[0.06em]">
@@ -214,7 +306,7 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
         </dl>
         {claim.scope && (
           <p className="mt-3 text-[14px]">
-            <span className="text-muted">Phạm vi (do LLM điền, code không kiểm tra): </span>
+            <span className="text-muted">Phạm vi (do AI điền, code không kiểm tra): </span>
             {claim.scope}
           </p>
         )}
@@ -251,14 +343,10 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
         </div>
         <p className="mt-1 text-[13px] text-muted">
           Quy tắc: A từ 8 điểm, B 6 đến 7, C 4 đến 5, D dưới 4. Độ mới: {claim.grade_detail.freshness_note ?? "không ghi"}.
-          Hạng có thể đổi khi cách đặt câu hỏi con đổi (lỗi đã biết trên trang Giới hạn).
         </p>
       </div>
 
-      <div className="rounded-lg border border-dashed border-ink/60 p-3 text-[14px]">
-        <p className="font-semibold">Duyệt của chuyên viên: chưa thực hiện</p>
-        <p className="text-muted">Bước duyệt claim của chuyên viên và xuất Word/PDF chưa được làm trong MVP.</p>
-      </div>
+      <ReviewRow claim={claim} />
     </div>
   );
 }

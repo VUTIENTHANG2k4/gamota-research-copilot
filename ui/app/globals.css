@@ -188,3 +188,49 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Print (Lưu thành PDF) of the memo page: only the memo, claim IDs, the stale warning and the limitations note. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    font-size: 11.5pt;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  /* The workspace grid collapses to one column: the source panel is no-print. */
+  .workspace-grid {
+    display: block !important;
+  }
+  .card {
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  li {
+    break-inside: avoid;
+  }
+  /* Keep the meaning of colours on paper: borders and text stay, fills may be dropped by the printer. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

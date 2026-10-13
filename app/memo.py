@@ -111,7 +111,7 @@ def build(p3: dict, mode: str, tag: str) -> dict:
     if any(s["conflicts"] for s in subs):
         next_steps.append("Xác minh định nghĩa/phạm vi đo của các con số mâu thuẫn trước khi dùng.")
     memo = {"question": p3["question"], "mode": mode, "overall": overall,
-            "analyst_review": "Chưa thực hiện (MVP): claim hạng A/B được duyệt tự động.",
+            "analyst_review": "Claim hạng A/B được duyệt tự động; chuyên viên có thể xác nhận hoặc loại claim và viết lại memo.",
             "subs": [{"id": s["id"], "text": s["text"], "verdict": s["verdict"],
                       "refused_text": NEI if s["verdict"]["refused"] else None,
                       "points": [pt for pt in points if pt["sub_id"] == s["id"]],

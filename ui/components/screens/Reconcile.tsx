@@ -75,17 +75,19 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
         <div>
           <SectionLabel>Nguyên nhân</SectionLabel>
           <p className="mt-1 font-semibold">{causeVi(c.cause)}</p>
-          <p className="text-[13px] text-muted">
-            Nhãn LLM gán: <span className="font-mono">{c.llm_cause ?? "không ghi"}</span> · kiểm lại bằng code:{" "}
-            <span className="font-mono">{c.recheck ?? "không ghi"}</span>. Code chỉ đối chiếu nhãn với thông tin nguồn,
-            không kiểm tra giải thích bên dưới.
-          </p>
+          {(c.llm_cause || c.recheck) && (
+            <p className="text-[13px] text-muted">
+              Nhãn AI gán: <span className="font-mono">{c.llm_cause ?? "không ghi"}</span> · kiểm lại bằng code:{" "}
+              <span className="font-mono">{c.recheck ?? "không ghi"}</span>. Code chỉ đối chiếu nhãn với thông tin nguồn,
+              không kiểm tra giải thích bên dưới.
+            </p>
+          )}
         </div>
         <div>
           <SectionLabel>Giải thích</SectionLabel>
           <p className="mt-1"><Inline text={c.explanation} /></p>
           <p className="mt-1 text-[13px] text-warn-text">
-            Do LLM viết; có thể vượt quá bằng chứng trong kho (lỗi đã biết, xem trang Giới hạn đã biết).
+            Do AI viết; có thể vượt quá bằng chứng trong kho. Hãy mở đoạn gốc của hai claim để kiểm tra.
           </p>
         </div>
         <div>
@@ -119,7 +121,7 @@ export default function ReconcilePage() {
     return [...m.values()];
   }, [run]);
 
-  if (run.needs_clarification || run.subs.length === 0) {
+  if (run.status === "needs_clarification" || run.subs.length === 0) {
     return (
       <EmptyState title="Chưa có gì để đối soát">
         Lần chạy này chưa truy xuất tài liệu nào nên không có claim để so sánh.
@@ -136,13 +138,16 @@ export default function ReconcilePage() {
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">Đối soát mâu thuẫn</h1>
         <p className="mt-2 text-muted">
           Hai claim cùng chủ đề nhưng con số lệch nhau (code tìm cặp lệch từ 10% trở lên). Mỗi cặp có nguyên nhân và gợi ý
-          dùng con số nào cho mục đích nào. Trang này chỉ để đọc.
+          dùng con số nào cho mục đích nào. Trang này chỉ để đọc; quyết định về từng claim nằm ở bước Kho bằng chứng.
         </p>
       </div>
 
-      <Banner tone="neutral" title="Duyệt của chuyên viên chưa có">
-        Bước duyệt claim của chuyên viên và xuất Word/PDF chưa được làm trong MVP.
-      </Banner>
+      {run.review_summary.rejected > 0 && (
+        <Banner tone="neutral" title={`${run.review_summary.rejected} claim đã bị loại khỏi memo`}>
+          Các mâu thuẫn liên quan tới claim đã loại không còn được liệt kê ở đây. Hoàn tác quyết định ở bước Kho bằng chứng
+          để xem lại.
+        </Banner>
+      )}
 
       <Workspace run={run}>
         {entries.length === 0 ? (
