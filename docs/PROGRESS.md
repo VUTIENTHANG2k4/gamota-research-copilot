@@ -205,3 +205,9 @@ Traps: D1-D4 caught (D2 and D4 only through the extra questions A and B); D5 (SY
 - The UI computes two warnings for evaluator defects: overall "Medium" next to refused sub-questions, and a sub-question with a level but no sentence.
 
 **How to run**: `docker compose up -d`; from the repo root `.venv\Scripts\python -m uvicorn api.main:app --port 8000`; in `ui/`: `npm install` (first time), `npm run dev`, open http://localhost:3000 (`ui/.env.local` holds `NEXT_PUBLIC_API_URL`, gitignored).
+
+## Separate deliverables (2026-10-13, after P5)
+
+User asked to split two pieces of work. Priority chosen: report first, lean product later.
+- **Test report for the contest judges (Word, Vietnamese)**: `tests/reports/Bao-cao-kiem-thu-gamota-research-copilot.docx` (10 pages). Built from the evaluator report `tests/reports/20261013-2115.md` and docs/PROGRESS.md without changing any result; includes T1-T9 in Expectation / Actual / Pass-Fail / Lesson form, strengths and weaknesses, metrics vs thresholds, baseline comparison, the limits of the test suite and answers to the 3 mandatory questions. Checked by exporting to PDF with Microsoft Word and viewing pages 1, 4 and 8 (the other pages were not viewed, and the docx XSD validator could not run: python package defusedxml missing).
+- **Lean product (UI + full interaction + deployment)**: NOT started. Decisions already given by the user: deploy = Vercel (UI) + Render/Railway (API, Postgres); interaction = analyst confirm/reject claims, Word/PDF export, persistent question history, answering clarifying questions; test-results and project-log content moves out of the product. Needs free-model quota to verify live runs, so it waits.
