@@ -1,0 +1,6 @@
+SYNTHETIC - tài liệu tự soạn để kiểm thử, toàn bộ số liệu và tên tổ chức là giả lập, KHÔNG phản ánh thị trường thật hay Gamota thật.
+
+Báo cáo A: Doanh thu mobile game Việt Nam 2025 tính theo tổng chi tiêu người chơi
+
+Phương pháp: doanh thu = tổng giá trị người chơi chi tiêu trong game, tính trước khi trừ phí cửa hàng ứng dụng, chỉ tính game trên iOS và Android.
+Kết quả: doanh thu mobile game Việt Nam năm 2025 đạt 700 triệu USD.

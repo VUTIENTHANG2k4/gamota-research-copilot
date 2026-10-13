@@ -1,0 +1,12 @@
+source_id,origin_group,reason
+S007,GameGeek-2025,"Both S007 and S008 attribute the USD 315M (2024) and USD 430M (2025 forecast) figures to GameGeek (read in the saved files by the main agent on 2026-10-13)"
+S008,GameGeek-2025,"Same as S007"
+S016,SocialPeta-2026-SEA,"Origin report; S017 and S018 repost it (cites_origin=S016)"
+S017,SocialPeta-2026-SEA,"cites_origin=S016 in sources.csv"
+S018,SocialPeta-2026-SEA,"cites_origin=S016 in sources.csv"
+SYN02,PR-Alpha-2026-08-10,"SYNTHETIC trap D2: cites_origin=PR-Alpha-2026-08-10"
+SYN03,PR-Alpha-2026-08-10,"SYNTHETIC trap D2"
+SYN04,PR-Alpha-2026-08-10,"SYNTHETIC trap D2"
+S001,Decree-147-2024-Official-Gazette,"S001-S003 are three Official Gazette PDFs of the same decree text"
+S002,Decree-147-2024-Official-Gazette,"Same"
+S003,Decree-147-2024-Official-Gazette,"Same"

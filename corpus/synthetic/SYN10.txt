@@ -1,0 +1,9 @@
+SYNTHETIC - tài liệu tự soạn để kiểm thử, toàn bộ số liệu và tên tổ chức là giả lập, KHÔNG phản ánh thị trường thật hay Gamota thật.
+
+Chỉ số vận hành tháng của game 'Kiếm Hiệp Idle' (giả lập)
+
+Game: Kiếm Hiệp Idle (tên giả lập). Quý 3/2026.
+DAU trung bình: 42.000.
+Retention D1: 38%.
+ARPDAU: 0,21 USD.
+Không có số liệu Retention D7 trong báo cáo này.
