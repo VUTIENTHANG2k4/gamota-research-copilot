@@ -8,7 +8,7 @@ This is an **MVP/prototype for a contest (Mission 2)**, not a production system.
 
 - Code, identifiers, comments, commit messages, and everything under `.claude/` are in **English**.
 - `docs/` (spec and design) is in **English**.
-- Everything the end user sees is in **Vietnamese**: the web UI, the memo, and the test reports in `tests/reports/`. Sample questions Q1-Q5 and the corpus text the pipeline processes keep their Vietnamese originals.
+- Everything the end user sees is in **Vietnamese**: the web UI, the memo, and the test reports in `backend/tests/reports/`. Sample questions Q1-Q5 and the corpus text the pipeline processes keep their Vietnamese originals.
 - Keep technical terms (claim, brief, memo) as they are, with a short Vietnamese gloss on first use in UI text.
 
 ## Non-negotiable rules (read before doing anything)
@@ -22,6 +22,8 @@ This is an **MVP/prototype for a contest (Mission 2)**, not a production system.
 
 ## Architecture and stack
 
+Repository layout: `backend/` (Python: `app/` pipeline, `api/` FastAPI, `corpus/`, `scripts/`, `tests/`, `Dockerfile`), `frontend/` (Next.js), `docs/`. Run Python commands from `backend/`; the virtualenv `.venv` and `.env` live at the repo root.
+
 | Layer | Choice |
 |---|---|
 | LLM | NVIDIA Nemotron 3 Ultra via OpenRouter, slug `nvidia/nemotron-3-ultra-550b-a55b`, set by the `LLM_MODEL` env var |
@@ -29,9 +31,9 @@ This is an **MVP/prototype for a contest (Mission 2)**, not a production system.
 | Database | PostgreSQL + pgvector (docker compose); keyword search as fallback if embeddings are not ready |
 | Embeddings | Local (e.g. bge-m3) or skipped in favour of keyword search; decided in P2 from measurements |
 | Frontend | Next.js + Tailwind, Vietnamese only |
-| Tests | pytest + `tests/run_eval.py` |
+| Tests | pytest + `backend/tests/run_eval.py` |
 
-`app/llm.py` is the **only** place that calls the model. Do not call OpenRouter anywhere else. Use temperature 0 and JSON-schema output, and save every response under `runs/` so results are reproducible.
+`backend/app/llm.py` is the **only** place that calls the model. Do not call OpenRouter anywhere else. Use temperature 0 and JSON-schema output, and save every response under `backend/runs/` so results are reproducible.
 
 **Data warning:** the free (`:free`) Nemotron endpoint logs usage to improve NVIDIA's products. Send only public documents and SYNTHETIC documents. Never send real Gamota data or personal data. It is not yet verified how well OpenRouter supports `response_format` JSON schema for this model: check it in P0. Fallback: parse JSON, validate with Pydantic, retry at most twice.
 

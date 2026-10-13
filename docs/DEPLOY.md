@@ -6,17 +6,17 @@ Target: UI on **Vercel**, API and PostgreSQL on **Render**, automatic deploys fr
 
 | Part | Where | Built from |
 |---|---|---|
-| UI (Next.js) | Vercel | `ui/` |
-| API (FastAPI) + corpus loader | Render web service (Docker) | `api/Dockerfile`, repo root as build context |
+| UI (Next.js) | Vercel | `frontend/` |
+| API (FastAPI) + corpus loader | Render web service (Docker) | `backend/Dockerfile`, `backend/` as build context |
 | Database | Render PostgreSQL | `render.yaml` (`gamota-copilot-db`) |
 
-On its first start the API loads the 30 fixed documents from `corpus/` into the empty database (`GET /api/health` shows `corpus.state`: `ingesting` then `ready`; allow a few minutes). The corpus is part of the Docker image (about 16 MB). pgvector is not needed: retrieval is keyword search only.
+On its first start the API loads the 30 fixed documents from `corpus/` into the empty database (`GET /api/health` shows `corpus.state`: `ingesting` then `ready`; allow a few minutes). The corpus (`backend/corpus/`) is part of the Docker image (about 16 MB). pgvector is not needed: retrieval is keyword search only.
 
 ## Steps
 
 1. Create a GitHub repository and push this repo (the `.env` file is gitignored and must stay out of git).
 2. **Render**: New, Blueprint, pick the repo (it reads `render.yaml`). When asked, set `OPENROUTER_API_KEY` (secret). Leave `CORS_ORIGINS` empty for now. Wait for the deploy; open `https://<api>.onrender.com/api/health` until `corpus.state` is `ready`.
-3. **Vercel**: Add New Project, import the repo, set **Root Directory** to `ui`, add the environment variable `NEXT_PUBLIC_API_URL` = the Render URL (no trailing slash). Deploy.
+3. **Vercel**: Add New Project, import the repo, set **Root Directory** to `frontend`, add the environment variable `NEXT_PUBLIC_API_URL` = the Render URL (no trailing slash). Deploy.
 4. Back on Render, set `CORS_ORIGINS` to the Vercel URL (for example `https://your-app.vercel.app`; several origins separated by commas) and let the service restart.
 5. Open the Vercel URL and run one question.
 
@@ -32,7 +32,7 @@ Render dashboard, service, Environment: edit `LLM_MODEL`, `OPENROUTER_API_KEY` o
 
 - `.github/workflows/ci.yml` runs on every push and pull request: Python tests against a PostgreSQL service container (a fake LLM is used, no key and no quota), and the UI lint and build.
 - Render (`autoDeploy: true`) and Vercel redeploy automatically when the main branch changes. To make deploys wait for CI, enable "Require status checks" on the branch in GitHub, and set Render's auto-deploy to "After CI checks pass".
-- The full scenario suite (`tests/run_eval.py`, T1-T9) is deliberately not in CI: it makes many model calls and takes about 1.5 hours on the free model.
+- The full scenario suite (`backend/tests/run_eval.py`, T1-T9) is deliberately not in CI: it makes many model calls and takes about 1.5 hours on the free model.
 
 ## Known caveats
 

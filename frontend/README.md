@@ -1,4 +1,4 @@
-# gamota-research-copilot UI (MVP / prototype)
+# gamota-research-copilot frontend (MVP / prototype)
 
 Next.js (App Router) + Tailwind, Vietnamese only. It reads and writes data ONLY through the FastAPI backend
 (`NEXT_PUBLIC_API_URL`). It never calls OpenRouter and holds no API keys. Design: `docs/design/DESIGN.md`.
@@ -18,21 +18,21 @@ The backend must allow the UI origin in `CORS_ORIGINS` (or `CORS_ORIGIN_REGEX`),
 ## Run locally
 
 1. PostgreSQL: `docker compose up -d` from the repo root.
-2. Backend, from the repo root: `.venv\Scripts\python -m uvicorn api.main:app --port 8000`
-3. UI, from `ui/`: `npm install` (first time), then `npm run dev` (http://localhost:3000)
+2. Backend, from `backend/`: `..\.venv\Scripts\python -m uvicorn api.main:app --port 8000`
+3. UI, from `frontend/`: `npm install` (first time), then `npm run dev` (http://localhost:3000)
    or `npm run build && npm start`.
 
-For a local backend, `ui/.env.local` may contain `NEXT_PUBLIC_API_URL=http://localhost:8000` (gitignored).
+For a local backend, `frontend/.env.local` may contain `NEXT_PUBLIC_API_URL=http://localhost:8000` (gitignored).
 
 ## Deploy on Vercel
 
-1. Import the repository in Vercel and set **Root Directory** to `ui`.
+1. Import the repository in Vercel and set **Root Directory** to `frontend`.
 2. Add the environment variable `NEXT_PUBLIC_API_URL` = the public URL of the deployed backend (for example
    `https://your-backend.example.com`), for the Production and Preview environments.
 3. Deploy. Framework preset: Next.js (build `npm run build`). Then add the Vercel domain to the backend's
    `CORS_ORIGINS` (or `CORS_ORIGIN_REGEX` for preview domains).
 
-No keys or secrets belong in `ui/`; the browser only knows the backend URL.
+No keys or secrets belong in `frontend/`; the browser only knows the backend URL.
 
 ## Checks
 
@@ -40,12 +40,12 @@ No keys or secrets belong in `ui/`; the browser only knows the backend URL.
 
 ### Local mock backend (UI tests only)
 
-`tests/mock_api.py` starts the REAL FastAPI routes (`api/main.py`) with an in-memory store instead of PostgreSQL runs,
-fixture runs from the saved results under `runs/p4/round_1`, and timed simulations instead of the model-backed jobs, so
+`tests/mock_api.py` starts the REAL FastAPI routes (`backend/api/main.py`) with an in-memory store instead of PostgreSQL runs,
+fixture runs from the saved results under `backend/runs/p4/round_1`, and timed simulations instead of the model-backed jobs, so
 no model quota is spent. Chunk passages still come from the real database (read-only).
 
 ```
-.venv\Scripts\python ui\tests\mock_api.py                      # from the repo root, listens on :8001
+.venv\Scripts\python frontend\tests\mock_api.py                # from the repo root, listens on :8001
 set NEXT_PUBLIC_API_URL=http://localhost:8001 && npm run dev   # UI on :3000
 ```
 
@@ -56,5 +56,5 @@ Switches (GET): `/mock/ingest?state=ingesting|ready|error`, `/mock/flag?name=bus
 
 - Screens live in `components/screens/`; the files under `app/runs/[id]/` only re-export them, because Tailwind's
   scanner skips directories with square brackets in the name.
-- The repo-root `.gitignore` ignores `runs/` (model logs). `ui/.gitignore` re-includes `app/runs/`, the UI route.
+- The repo-root `.gitignore` ignores `/runs/` and `/backend/runs/` (model logs). `frontend/.gitignore` re-includes `app/runs/`, the UI route.
   Do not remove that line or the run pages disappear from git (and from the Vercel build).

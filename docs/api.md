@@ -1,6 +1,6 @@
 # API contract: lean MVP (prototype)
 
-Backend: FastAPI in `api/main.py`. Local start from the repo root: `.venv\Scripts\python -m uvicorn api.main:app --port 8000` (PostgreSQL must be up, `DATABASE_URL`). CORS origins come from `CORS_ORIGINS` (comma separated) and optional `CORS_ORIGIN_REGEX`. The UI calls only this API; it never calls OpenRouter.
+Backend: FastAPI in `backend/api/main.py`. Local start from `backend/`: `..\.venv\Scripts\python -m uvicorn api.main:app --port 8000` (PostgreSQL must be up, `DATABASE_URL`). CORS origins come from `CORS_ORIGINS` (comma separated) and optional `CORS_ORIGIN_REGEX`. The UI calls only this API; it never calls OpenRouter.
 
 All user-visible strings from the API are Vietnamese; field names are English. Runs, review decisions and history are stored in PostgreSQL and survive restarts. The corpus (30 fixed documents) is loaded into an empty database on first start (`/api/health` shows `corpus.state`: `starting`, `ingesting`, `ready`, `error`).
 

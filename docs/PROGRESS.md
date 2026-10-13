@@ -232,3 +232,7 @@ Split from the contest report at the user's request. The old demo UI is kept in 
 - The earlier P5 commit missed `ui/app/runs/` because the root `.gitignore` had `runs/`; it is now anchored (`/runs/`). Tag `demo-p5` therefore lacks those pages.
 
 Open defects of the pipeline itself (relevance check, overall confidence, retrieval misses, table/chart parsing) are unchanged; see the P4 section.
+
+### Restructure into backend/ and frontend/ (2026-10-14)
+
+Layout is now `backend/` (Python) and `frontend/` (Next.js); see README and CLAUDE.md. Paths in the sections above that mention `app/`, `api/`, `corpus/`, `tests/`, `scripts/`, `runs/` or `ui/` refer to the old layout, i.e. `backend/<name>` and `frontend`. Checked after the move: pytest 29 passed (run from `backend/`), frontend `tsc`, lint and build clean, `docker build` with context `backend/` succeeds and the container loads the corpus into an empty PostgreSQL (`corpus.state=ready`, 686 chunks, 30 documents). Not yet checked: `render.yaml` and CI on GitHub, Vercel build with Root Directory `frontend`, nothing pushed or deployed. Still no live-model run of the lean product (free-tier quota).

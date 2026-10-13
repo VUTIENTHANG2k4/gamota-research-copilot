@@ -2,7 +2,7 @@
 
 Trợ lý AI nghiên cứu thị trường game cho Gamota. Nhận một câu hỏi nghiên cứu, trả về **memo 1 trang** gồm kết luận, mức chắc chắn và căn cứ kiểm chứng được: mỗi con số bấm vào là xem được đoạn trích gốc.
 
-> **Trạng thái hiện tại:** mới có đặc tả và khung agent, **chưa có dòng code nào** và chưa chạy thử khung này với Claude Code thật. Đây là MVP/prototype cho cuộc thi (Mission 2), không phải sản phẩm production.
+> **Trạng thái hiện tại:** MVP/prototype cho cuộc thi (Mission 2), không phải sản phẩm hoàn chỉnh. Pipeline, API, giao diện và bộ kiểm thử đã có; xem `docs/PROGRESS.md` để biết kết quả đo thật và các lỗi còn mở. Chưa deploy.
 
 ## Dự án chứng minh điều gì
 
@@ -18,20 +18,36 @@ Phần cốt lõi là bộ máy biến nguồn thành nhận định có căn c�
 
 ```
 gamota-research-copilot/
+├── backend/                  # Toàn bộ Python
+│   ├── app/                  # Pipeline: brief, retrieve, extract, verify, grade, dedupe, conflict, confidence, memo; llm.py là nơi duy nhất gọi mô hình
+│   ├── api/                  # FastAPI: lịch sử, duyệt claim, viết lại memo, xuất Word
+│   ├── corpus/               # 30 tài liệu cố định (18 thật, 12 SYNTHETIC), sources.csv
+│   ├── scripts/              # Script chạy từng giai đoạn
+│   ├── tests/                # pytest, run_eval.py (T1-T9), reports/
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/                 # Next.js + Tailwind, tiếng Việt
+├── docs/                     # Đặc tả, thiết kế, PROGRESS.md, CHANGES.md, DEPLOY.md, api.md
+├── .claude/agents/           # Subagent: source-collector, evaluator, ui-builder
+├── .github/workflows/ci.yml  # CI: test backend (LLM giả) và build frontend
+├── docker-compose.yml        # PostgreSQL cho chạy cục bộ
+├── render.yaml               # Render Blueprint (API + PostgreSQL)
 ├── CLAUDE.md                 # Quy tắc và kế hoạch cho Claude Code (tiếng Anh)
-├── README.md                 # File này
-├── .env.example              # Mẫu cấu hình, sao chép thành .env
-├── .claude/agents/
-│   ├── source-collector.md   # Subagent thu thập nguồn thật (P1)
-│   ├── evaluator.md          # Subagent chấm kiểm thử độc lập (P4)
-│   └── ui-builder.md         # Subagent dựng giao diện Next.js (P5)
-└── docs/
-    ├── design/DESIGN.md      # Thiết kế giao diện đã duyệt (font, màu, bố cục)
-    ├── SPEC.md               # Mục lục đặc tả
-    └── spec/                 # Đặc tả chia thành 9 file nhỏ (tiếng Anh)
+└── .env.example              # Mẫu cấu hình, sao chép thành .env ở thư mục gốc
 ```
 
-Các thư mục `app/`, `corpus/`, `tests/`, `ui/` chưa tồn tại; Claude Code sẽ tạo trong quá trình làm.
+## Chạy cục bộ
+
+```
+docker compose up -d                                  # PostgreSQL, cổng 5434
+python -m venv .venv && .venv\Scripts\pip install -r backend/requirements.txt
+cd backend
+..\.venv\Scripts\python -m app.ingest                 # nạp 30 tài liệu (lần đầu)
+..\.venv\Scripts\python -m uvicorn api.main:app --port 8000
+cd ../frontend && npm install && npm run dev          # http://localhost:3000
+```
+
+Kiểm thử: `cd backend && ..\.venv\Scripts\python -m pytest tests -q` (dùng LLM giả, không tốn hạn mức). Hướng dẫn deploy: `docs/DEPLOY.md`.
 
 ## Bộ đặc tả
 
@@ -77,7 +93,7 @@ Nếu hết giờ, cắt từ P5 trở lên. **Không bao giờ cắt P4**: khô
 
 ## Cách bắt đầu
 
-1. Sao chép `.env.example` thành `.env`, điền `OPENROUTER_API_KEY`.
+1. Sao chép `.env.example` thành `.env` (ở thư mục gốc), điền `OPENROUTER_API_KEY`.
 2. Mở thư mục này bằng Claude Code và yêu cầu: *"Đọc CLAUDE.md và bắt đầu P0."*
 3. Cuối mỗi giai đoạn, đọc báo cáo, rồi cho phép làm giai đoạn tiếp theo.
 

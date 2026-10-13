@@ -1,9 +1,7 @@
-.git
 .venv
 .env
-ui
 runs
 tests
-docs
+scripts
 node_modules
 **/__pycache__

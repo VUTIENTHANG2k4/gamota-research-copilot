@@ -18,8 +18,8 @@ The goal is enough material to exercise: conflicting market-size figures (differ
 
 ## How to work
 
-1. Save each snapshot to `corpus/raw/<id>.html`, `.pdf`, or `.txt`. IDs look like `S001`, `S002`.
-2. Record every source in `corpus/sources.csv` with columns: `id, title, url, source_type, org, publish_date, data_date, has_methodology, conflict_of_interest_note, cites_origin, retrieved_at, sha256, is_synthetic, notes`.
+1. Save each snapshot to `backend/corpus/raw/<id>.html`, `.pdf`, or `.txt`. IDs look like `S001`, `S002`.
+2. Record every source in `backend/corpus/sources.csv` with columns: `id, title, url, source_type, org, publish_date, data_date, has_methodology, conflict_of_interest_note, cites_origin, retrieved_at, sha256, is_synthetic, notes`.
 3. Compute `sha256` with `sha256sum` on the saved file. Take `retrieved_at` from `date -u`.
 4. `cites_origin` holds the ID or URL of the original source if the article only repeats it. Do not guess; leave it empty if unclear.
 5. `is_synthetic` is always `false` for documents you collect.
@@ -28,7 +28,7 @@ The goal is enough material to exercise: conflicting market-size figures (differ
 
 - **Do not write, summarize, or edit** the content of any downloaded document. Save it verbatim.
 - **Do not invent** URLs, dates, figures, or organization names. If a field cannot be determined, leave it empty and explain in `notes`.
-- Do not bypass paywalls or site blocks. If a page is unreachable, list it in `corpus/UNAVAILABLE.md` with the URL and reason so the user can download it manually.
+- Do not bypass paywalls or site blocks. If a page is unreachable, list it in `backend/corpus/UNAVAILABLE.md` with the URL and reason so the user can download it manually.
 - Do not collect paid reports (Sensor Tower, Niko Partners, Newzoo, full Statista). Use only the public parts.
 - Do not create SYNTHETIC documents. The main agent does that.
 - Do not assign A-D reliability grades. `grade.py` does that; you only supply metadata.

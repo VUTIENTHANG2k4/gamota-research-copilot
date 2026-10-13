@@ -1,4 +1,4 @@
-# Build context is the repository root: docker build -f api/Dockerfile .
+# Build context is backend/: docker build -t gamota-copilot-api backend
 FROM python:3.12-slim
 WORKDIR /srv
 ENV PYTHONUNBUFFERED=1 PYTHONUTF8=1 PIP_NO_CACHE_DIR=1
