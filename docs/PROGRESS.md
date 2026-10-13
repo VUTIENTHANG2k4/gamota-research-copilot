@@ -188,3 +188,20 @@ Traps: D1-D4 caught (D2 and D4 only through the extra questions A and B); D5 (SY
 **Gate P4 ("T1-T9 table has real results")**: met in the sense that every scenario has a real, independently graded result, including 5 failures. It does not show a product that answers Q2, Q3 and Q4 well.
 
 **P4 gate: approved by the user on 2026-10-13 with limitations recorded**: one round only (stability not measured), T1/T5/T7/T8/T9 failed, T2 passes only with SYNTHETIC documents, the five open defects above remain. The UI and the Known limitations page must show these honestly.
+
+## P5 - Next.js UI (2026-10-13)
+
+**Built**: `api/main.py` (FastAPI: saved P4 results from `runs/p4/round_1`, live runs via `POST /api/runs`, test results and limitations parsed from `tests/reports/*.md` and `docs/PROGRESS.md`), `docs/api.md` (contract), `ui/` (Next.js + Tailwind, TypeScript) by the `ui-builder` subagent: 6 screens (Brief, Kho bằng chứng with source-passage panel, Đối soát mâu thuẫn read-only, Memo with real/test toggle and SYNTHETIC banner, Kết quả kiểm thử, Giới hạn đã biết). The UI only calls this API, never OpenRouter; no keys in `ui/`.
+
+**Verified (by the subagent, re-checked by the main agent where noted)**
+- Q1, Q2, Q4 flow from Brief to Memo run in a real headless browser against the real API and database, desktop and a 390 px mobile run for Q2; `tsc --noEmit`, `npm run lint` and `npm run build` clean (main agent re-ran the build: passes; nothing outside `ui/` was changed; no API key found in the repo).
+- Error states (failed live run, clarification run, chunk 503 with the passage still shown, API unreachable) were tested only against a small mock (`ui/tests/mock-api.mjs`) that proxies the real API.
+
+**Not verified / not done (honest list)**
+- No real live run: `POST /api/runs` was never run end to end (no LLM quota); the success path (job finishes, redirect to the new run) is untested; only the error path was exercised, against the mock.
+- Screenshots were reviewed for Brief, Evidence, Reconciliation, Memo and Test results; the limitations page, the live-error, clarification and unreachable states were checked by text assertions only. No screen-reader or keyboard test, no contrast measurement, widths between 390 and 1360 px not tried.
+- Analyst review (confirm/reject/undo) and Word/PDF export are NOT implemented; the UI says so in one plain line.
+- Backend/data gaps seen by the UI: claim `value`, `unit`, `data_date` are null in all saved claims (the UI uses claim text and the source's data date); `defects_from_progress` and `not_checked` are English text shown as is; the T6 (AMB) and T7 saved data cannot be opened through `/api/runs` (404 by design of the key whitelist), so the clarification screen was only tested with the mock; the memo has no single conclusion sentence, so the headline is the question plus the overall confidence band; a live job is lost if the page is reloaded.
+- The UI computes two warnings for evaluator defects: overall "Medium" next to refused sub-questions, and a sub-question with a level but no sentence.
+
+**How to run**: `docker compose up -d`; from the repo root `.venv\Scripts\python -m uvicorn api.main:app --port 8000`; in `ui/`: `npm install` (first time), `npm run dev`, open http://localhost:3000 (`ui/.env.local` holds `NEXT_PUBLIC_API_URL`, gitignored).

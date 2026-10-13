@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/* Colour tokens: docs/design/DESIGN.md. Light theme only; no auto-inverted dark mode. */
+@theme inline {
+  --color-page: #eef2f5;
+  --color-surface: #ffffff;
+  --color-subtle: #f6f8fa;
+  --color-line: #d5dde5;
+  --color-ink: #12202c;
+  --color-muted: #4a5b6a;
+  --color-accent: #0e5a6b;
+  --color-warn-bg: #fcebc8;
+  --color-warn-text: #4a3000;
+  --color-warn-border: #b97a00;
+  --color-danger-bg: #f8dad3;
+  --color-danger-text: #8a2a1a;
+  --color-ok-bg: #ddf3e7;
+  --color-ok-text: #0b5a33;
+  --color-hl: #ffe49a;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+html {
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  background: var(--color-page);
+  color: var(--color-ink);
+  overflow-x: hidden;
+}
+
+/* Visible focus on every interactive element. */
+:where(a, button, summary, textarea, input, select):focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section label: 12px mono, uppercase, letter-spacing 0.06em (DESIGN.md). */
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-accent);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 32px;
+  }
+}
+
+/* Buttons: min height 44px, 8px radius, 14px / 600. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #0a4654;
+}
+.btn-primary:disabled {
+  background: #6b8a92;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+}
+.btn-secondary:hover {
+  background: var(--color-subtle);
+}
+
+/* Markdown rendered from the API (report text, memo explanations). */
+.md p {
+  margin: 0 0 0.7em;
+}
+.md ul,
+.md ol {
+  margin: 0 0 0.8em;
+  padding-left: 1.3em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin-bottom: 0.35em;
+}
+.md h3,
+.md h4,
+.md h5 {
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--color-subtle);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+.md blockquote {
+  border-left: 3px solid var(--color-line);
+  padding-left: 12px;
+  color: var(--color-muted);
+  margin: 0 0 0.8em;
+}
+.md .table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1em;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+}
+.md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+.md th,
+.md td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-line);
+}
+.md th {
+  background: var(--color-subtle);
+  font-weight: 600;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 12px;
+  top: 12px;
+  z-index: 50;
+  background: var(--color-surface);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
