@@ -186,3 +186,5 @@ Traps: D1-D4 caught (D2 and D4 only through the extra questions A and B); D5 (SY
 **Not checked**: stability between runs, human analyst review (step not implemented; claims are auto-approved), embeddings (bge-m3 not tried), a second model.
 
 **Gate P4 ("T1-T9 table has real results")**: met in the sense that every scenario has a real, independently graded result, including 5 failures. It does not show a product that answers Q2, Q3 and Q4 well.
+
+**P4 gate: approved by the user on 2026-10-13 with limitations recorded**: one round only (stability not measured), T1/T5/T7/T8/T9 failed, T2 passes only with SYNTHETIC documents, the five open defects above remain. The UI and the Known limitations page must show these honestly.
