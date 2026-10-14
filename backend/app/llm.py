@@ -5,6 +5,7 @@ Temperature 0, optional JSON-schema output, every response saved under runs/.
 import hashlib
 import json
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,7 @@ load_dotenv()
 RUNS_DIR = Path(__file__).resolve().parent.parent / "runs"
 
 
+_KEY_LOCK = threading.Lock()  # model calls may run in parallel threads
 _KEY_POS = 0  # index of the key currently in use; advanced when a key hits its daily free limit
 
 
@@ -89,11 +91,15 @@ def chat(messages: list[dict], schema: dict | None = None, tag: str = "call",
             payload = r.json()
             if status == 200 and "error" in payload and "choices" not in payload:
                 status = int(payload["error"].get("code") or 502)  # upstream error delivered inside an HTTP 200
-            if status == 429 and "free-models-per-day" in json.dumps(payload) and _KEY_POS < len(_keys()) - 1:
-                _KEY_POS += 1  # this key's daily free quota is used up: switch to the next configured key
-                cfg = _config()
-                waits.insert(0, 0)
-                continue
+            if status == 429 and "free-models-per-day" in json.dumps(payload):
+                with _KEY_LOCK:  # several threads may hit the limit together: advance the key only once
+                    if cfg["key"] == _config()["key"] and _KEY_POS < len(_keys()) - 1:
+                        _KEY_POS += 1  # this key's daily free quota is used up: switch to the next configured key
+                    switched = cfg["key"] != _config()["key"]
+                if switched:
+                    cfg = _config()
+                    waits.insert(0, 0)
+                    continue
             if status not in (429, 500, 502, 503, 504):
                 break
     except Exception as e:  # saved below, then re-raised
