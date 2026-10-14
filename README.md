@@ -1,40 +1,44 @@
 # gamota-research-copilot
 
-Trợ lý AI nghiên cứu thị trường game cho Gamota. Nhận một câu hỏi nghiên cứu, trả về **memo 1 trang** gồm kết luận, mức chắc chắn và căn cứ kiểm chứng được: mỗi con số bấm vào là xem được đoạn trích gốc.
+Trợ lý AI nghiên cứu thị trường game cho Gamota. Nhận một câu hỏi nghiên cứu, trả về **memo 1 trang** gồm kết luận, mức chắc chắn kèm lý do và căn cứ kiểm chứng được: mỗi con số dẫn về đoạn trích gốc trong nguồn.
 
-> **Trạng thái hiện tại:** MVP/prototype cho cuộc thi (Mission 2), không phải sản phẩm hoàn chỉnh. Pipeline, API, giao diện và bộ kiểm thử đã có; xem `docs/PROGRESS.md` để biết kết quả đo thật và các lỗi còn mở. Chưa deploy.
+> **MVP / prototype** cho cuộc thi (Mission 2), không phải sản phẩm hoàn chỉnh. Kho nguồn cố định gồm 30 tài liệu (18 tài liệu thật, 12 tài liệu tự soạn gắn nhãn `SYNTHETIC`). Kết quả đo thật và các lỗi còn mở nằm trong `docs/PROGRESS.md`.
 
 ## Dự án chứng minh điều gì
 
 Một hệ thống AI có thể vừa nhanh vừa đáng tin, nếu:
 
-1. Mọi nhận định đều bám vào nguồn và kiểm tra được bằng code.
-2. Nguồn được chấm hạng khác nhau, không coi mọi nguồn ngang nhau.
+1. Mọi nhận định đều bám vào nguồn và được kiểm tra bằng code, không chỉ dựa vào mô hình.
+2. Nguồn được chấm hạng A-D, không coi mọi nguồn ngang nhau.
 3. Hệ thống biết nói **"Chưa đủ căn cứ"** khi thiếu dữ liệu, thay vì đoán.
 
-Phần cốt lõi là bộ máy biến nguồn thành nhận định có căn cứ: trích claim, kiểm tra trích dẫn, chấm hạng nguồn, xử lý mâu thuẫn, sinh memo.
+## Cách hoạt động
+
+Câu hỏi → brief (làm rõ phạm vi) → truy xuất đoạn tài liệu → trích claim (mô hình) → **kiểm tra trích dẫn (code)** → **chấm hạng nguồn, gộp nguồn trùng gốc (code)** → đối soát mâu thuẫn → **mức chắc chắn theo luật cứng (code)** → chuyên viên xác nhận hoặc loại claim → memo.
+
+Người dùng có thể xác nhận hoặc loại từng claim, trả lời câu hỏi làm rõ, viết lại memo, xuất Word, lưu PDF và xem lại lịch sử.
 
 ## Cấu trúc thư mục
 
 ```
 gamota-research-copilot/
-├── backend/                  # Toàn bộ Python
-│   ├── app/                  # Pipeline: brief, retrieve, extract, verify, grade, dedupe, conflict, confidence, memo; llm.py là nơi duy nhất gọi mô hình
-│   ├── api/                  # FastAPI: lịch sử, duyệt claim, viết lại memo, xuất Word
-│   ├── corpus/               # 30 tài liệu cố định (18 thật, 12 SYNTHETIC), sources.csv
-│   ├── scripts/              # Script chạy từng giai đoạn
-│   ├── tests/                # pytest, run_eval.py (T1-T9), reports/
+├── backend/            # Python: pipeline, API, kho tài liệu, kiểm thử
+│   ├── app/            # Pipeline; llm.py là nơi duy nhất gọi mô hình
+│   ├── api/            # FastAPI: lịch sử, duyệt claim, viết lại memo, xuất Word
+│   ├── corpus/         # 30 tài liệu cố định và sources.csv
+│   ├── scripts/
+│   ├── tests/          # pytest, run_eval.py (T1-T9), reports/
 │   ├── Dockerfile
 │   └── requirements.txt
-├── frontend/                 # Next.js + Tailwind, tiếng Việt
-├── docs/                     # Đặc tả, thiết kế, PROGRESS.md, CHANGES.md, DEPLOY.md, api.md
-├── .claude/agents/           # Subagent: source-collector, evaluator, ui-builder
-├── .github/workflows/ci.yml  # CI: test backend (LLM giả) và build frontend
-├── docker-compose.yml        # PostgreSQL cho chạy cục bộ
-├── render.yaml               # Render Blueprint (API + PostgreSQL)
-├── CLAUDE.md                 # Quy tắc và kế hoạch cho Claude Code (tiếng Anh)
-└── .env.example              # Mẫu cấu hình, sao chép thành .env ở thư mục gốc
+├── frontend/           # Next.js + Tailwind, tiếng Việt
+├── docs/               # Đặc tả, thiết kế, PROGRESS.md, CHANGES.md, DEPLOY.md, api.md
+├── .github/workflows/  # CI: test backend (LLM giả) và build frontend
+├── docker-compose.yml  # PostgreSQL cho chạy cục bộ
+├── render.yaml         # Render Blueprint (API + PostgreSQL)
+└── .env.example        # Mẫu cấu hình, sao chép thành .env ở thư mục gốc
 ```
+
+Công nghệ: Python 3.12, FastAPI, PostgreSQL, tìm kiếm từ khóa BM25; Next.js; mô hình NVIDIA Nemotron 3 Ultra qua OpenRouter (đổi bằng biến môi trường `LLM_MODEL`).
 
 ## Chạy cục bộ
 
@@ -47,70 +51,32 @@ cd backend
 cd ../frontend && npm install && npm run dev          # http://localhost:3000
 ```
 
-Kiểm thử: `cd backend && ..\.venv\Scripts\python -m pytest tests -q` (dùng LLM giả, không tốn hạn mức). Hướng dẫn deploy: `docs/DEPLOY.md`.
+Cần sao chép `.env.example` thành `.env` ở thư mục gốc và điền `OPENROUTER_API_KEY`. Không bao giờ commit `.env`.
 
-## Bộ đặc tả
+Kiểm thử: `cd backend && ..\.venv\Scripts\python -m pytest tests -q` (dùng mô hình giả, không tốn hạn mức).
 
-Toàn bộ tài liệu trong `docs/` viết bằng tiếng Anh (giao diện, memo và báo cáo kiểm thử vẫn bằng tiếng Việt).
+## Triển khai
 
-| File | Nội dung |
+Giao diện trên Vercel, API và PostgreSQL trên Render, tự động deploy khi đẩy lên `main`. Hướng dẫn từng bước và cách đổi model hoặc key sau khi deploy: `docs/DEPLOY.md`.
+
+## Tài liệu
+
+| Tệp | Nội dung |
 |---|---|
-| `docs/spec/00-decisions.md` | Các quyết định đã chốt. **Thắng nếu các file khác mâu thuẫn** |
-| `docs/spec/01-overview.md` | Tóm tắt MVP, phạm vi, người dùng |
-| `docs/spec/02-pipeline-and-requirements.md` | Core loop và yêu cầu chức năng |
-| `docs/spec/03-data-model-and-scoring-rules.md` | Mô hình dữ liệu, luật chấm hạng và mức chắc chắn |
-| `docs/spec/04-architecture.md` | Kiến trúc, tech stack, chốt chặn chất lượng |
-| `docs/spec/05-corpus-and-sample-questions.md` | Kho nguồn, câu hỏi mẫu Q1-Q5 |
-| `docs/spec/06-evaluation.md` | Tình huống kiểm thử T1-T9, chỉ số |
-| `docs/spec/07-contest-answers.md` | Bản nháp trả lời 3 câu hỏi bắt buộc |
-| `docs/spec/08-plan-risks-agents-honesty.md` | Kế hoạch, rủi ro, khung agent, nguyên tắc trung thực |
+| `docs/PROGRESS.md` | Tiến độ, số đo thật, lỗi còn mở |
+| `docs/CHANGES.md` | Các thay đổi so với kế hoạch ban đầu và lý do |
+| `docs/DEPLOY.md` | Hướng dẫn triển khai |
+| `docs/api.md` | Hợp đồng API |
+| `docs/design/DESIGN.md` | Thiết kế giao diện |
+| `docs/spec/` | Đặc tả chi tiết (tiếng Anh) |
+| `backend/tests/reports/` | Báo cáo kiểm thử (tiếng Việt) |
 
-Vì sao chia nhỏ: `CLAUDE.md` được nạp vào mọi phiên, còn file spec chỉ được đọc khi giai đoạn cần. Bảng "giai đoạn nào đọc file nào" nằm trong `CLAUDE.md`.
+## Giới hạn đáng biết
 
-## Khung agent
+- Đây là prototype: kết quả phải được người dùng đối chiếu với đoạn trích gốc trước khi dùng.
+- Kho nguồn chỉ có 30 tài liệu cố định; câu hỏi ngoài phạm vi sẽ nhận "Chưa đủ căn cứ".
+- Tài liệu `SYNTHETIC` chỉ để thử các tình huống bẫy, không dùng để rút kết luận về thị trường thật.
+- Sản phẩm chưa có đăng nhập: ai có link đều chạy được câu hỏi và dùng hạn mức mô hình của người triển khai.
+- Endpoint miễn phí `:free` của mô hình có ghi log sử dụng; chỉ gửi tài liệu công khai và SYNTHETIC, không gửi dữ liệu thật của Gamota.
 
-Một agent chính giữ kế hoạch và pipeline, ba subagent chuyên trách:
-
-| Agent | Việc | Giới hạn chính |
-|---|---|---|
-| Agent chính | Kế hoạch, pipeline từ ingest đến memo | Cập nhật `docs/PROGRESS.md` và `docs/CHANGES.md` mỗi giai đoạn |
-| `source-collector` | Thu thập nguồn thật, ghi `sources.csv` | Không viết hay sửa nội dung tài liệu, không bịa metadata |
-| `evaluator` | Chạy T1-T9 và baseline, chấm độc lập | Không sửa code, không sửa kỳ vọng |
-| `ui-builder` | Dựng giao diện Next.js tiếng Việt | Chỉ bắt đầu sau P4, phải hiển thị trung thực |
-
-## Các giai đoạn (mỗi giai đoạn dừng chờ bạn duyệt)
-
-| GĐ | Việc | Cổng duyệt |
-|---|---|---|
-| P0 | Khởi tạo repo, docker compose, kiểm tra gọi được OpenRouter | Gọi mô hình thành công |
-| P1 | Thu thập kho nguồn thật, soạn tài liệu bẫy SYNTHETIC | Bạn xem danh sách nguồn |
-| P2 | ingest, retrieve, extract, verify | Q1-Q5 ra được claim hợp lệ |
-| P3 | grade, dedupe, conflict, confidence, từ chối khi thiếu dữ liệu | Bẫy bị bắt, Q4 bị từ chối |
-| P4 | memo, baseline, bộ kiểm thử T1-T9 | Bảng kết quả thật |
-| P5 | Giao diện Next.js | Demo chạy từ đầu đến cuối |
-
-Nếu hết giờ, cắt từ P5 trở lên. **Không bao giờ cắt P4**: không có kết quả kiểm thử thì không chứng minh được gì.
-
-## Cách bắt đầu
-
-1. Sao chép `.env.example` thành `.env` (ở thư mục gốc), điền `OPENROUTER_API_KEY`.
-2. Mở thư mục này bằng Claude Code và yêu cầu: *"Đọc CLAUDE.md và bắt đầu P0."*
-3. Cuối mỗi giai đoạn, đọc báo cáo, rồi cho phép làm giai đoạn tiếp theo.
-
-Cần có sẵn: Docker, Python, Node.js. Cú pháp khai báo subagent trong `.claude/agents/` chưa được thử với Claude Code thật; nếu Claude Code không nhận ra, hãy kiểm tra lại định dạng theo tài liệu của nó.
-
-## Nguyên tắc trung thực
-
-1. Không che giấu lỗi hay hạn chế; trình bày chúng rõ ràng và chuyên nghiệp.
-2. Không sửa kỳ vọng để kiểm thử đạt. Thất bại là kết quả hợp lệ.
-3. Không bịa số liệu, nguồn, URL hay trích dẫn.
-4. Tài liệu tự soạn luôn gắn nhãn `SYNTHETIC`.
-5. Không gọi sản phẩm là production-ready.
-6. Không commit hay in API key.
-
-## Lưu ý về mô hình và dữ liệu
-
-- Mô hình: NVIDIA Nemotron 3 Ultra qua OpenRouter (`nvidia/nemotron-3-ultra-550b-a55b`).
-- Endpoint miễn phí (`:free`) có ghi log để NVIDIA cải thiện sản phẩm. Chỉ gửi tài liệu công khai và tài liệu SYNTHETIC; không gửi dữ liệu thật của Gamota.
-- Chưa xác minh được OpenRouter hỗ trợ ép JSON schema cho mô hình này đến đâu, chất lượng tiếng Việt và độ trễ. P0 sẽ đo; phương án dự phòng là parse JSON, kiểm tra bằng Pydantic và thử lại tối đa 2 lần.
-- Bản đặc tả trên Docs và bản trong `docs/spec/` là hai bản riêng. Bản trong repo là bản Claude Code dùng; nếu sửa tay một bên, bên kia không tự đổi theo.
+Danh sách đầy đủ có ở trang "Giới hạn đã biết" trong giao diện.
