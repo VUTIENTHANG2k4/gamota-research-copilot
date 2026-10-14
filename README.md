@@ -2,7 +2,7 @@
 
 Trợ lý AI nghiên cứu thị trường game cho Gamota. Nhận một câu hỏi nghiên cứu, trả về **memo 1 trang** gồm kết luận, mức chắc chắn kèm lý do và căn cứ kiểm chứng được: mỗi con số dẫn về đoạn trích gốc trong nguồn.
 
-> **MVP / prototype** cho cuộc thi (Mission 2), không phải sản phẩm hoàn chỉnh. Kho nguồn cố định gồm 30 tài liệu (18 tài liệu thật, 12 tài liệu tự soạn gắn nhãn `SYNTHETIC`). Kết quả đo thật và các lỗi còn mở nằm trong `docs/PROGRESS.md`.
+> **MVP / prototype** cho cuộc thi (Mission 2), không phải sản phẩm hoàn chỉnh. Kho nguồn cố định gồm 30 tài liệu (18 tài liệu thật, 12 tài liệu tự soạn gắn nhãn `SYNTHETIC`).
 
 ## Dự án chứng minh điều gì
 
@@ -31,7 +31,6 @@ gamota-research-copilot/
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/           # Next.js + Tailwind, tiếng Việt
-├── docs/               # Đặc tả, thiết kế, PROGRESS.md, CHANGES.md, DEPLOY.md, api.md
 ├── .github/workflows/  # CI: test backend (LLM giả) và build frontend
 ├── docker-compose.yml  # PostgreSQL cho chạy cục bộ
 ├── render.yaml         # Render Blueprint (API + PostgreSQL)
@@ -57,19 +56,11 @@ Kiểm thử: `cd backend && ..\.venv\Scripts\python -m pytest tests -q` (dùng 
 
 ## Triển khai
 
-Giao diện trên Vercel, API và PostgreSQL trên Render, tự động deploy khi đẩy lên `main`. Hướng dẫn từng bước và cách đổi model hoặc key sau khi deploy: `docs/DEPLOY.md`.
+Giao diện trên Vercel, API và PostgreSQL trên Render, tự động deploy khi đẩy lên `main`. Đổi model hoặc key sau khi deploy bằng biến môi trường trên Render, không cần sửa mã.
 
-## Tài liệu
+## Báo cáo kiểm thử
 
-| Tệp | Nội dung |
-|---|---|
-| `docs/PROGRESS.md` | Tiến độ, số đo thật, lỗi còn mở |
-| `docs/CHANGES.md` | Các thay đổi so với kế hoạch ban đầu và lý do |
-| `docs/DEPLOY.md` | Hướng dẫn triển khai |
-| `docs/api.md` | Hợp đồng API |
-| `docs/design/DESIGN.md` | Thiết kế giao diện |
-| `docs/spec/` | Đặc tả chi tiết (tiếng Anh) |
-| `backend/tests/reports/` | Báo cáo kiểm thử (tiếng Việt) |
+Báo cáo kiểm thử bằng tiếng Việt nằm trong `backend/tests/reports/`.
 
 ## Giới hạn đáng biết
 

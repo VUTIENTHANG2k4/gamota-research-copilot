@@ -12,3 +12,6 @@ runs_api*.log
 # Local agent configuration (kept on the developer machine, not published)
 /.claude/
 /CLAUDE.md
+
+# Project documentation kept locally (not published)
+/docs/
