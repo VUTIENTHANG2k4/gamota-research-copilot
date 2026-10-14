@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { clearSession, currentSession, onSessionChange } from "@/lib/auth";
 
 const STEPS = [
   { slug: "", label: "Brief" },
@@ -17,6 +19,13 @@ export function SiteHeader() {
   const sub = m?.[2] ?? "";
   const onHome = pathname === "/" || !!m;
   const onLimits = pathname.startsWith("/limitations");
+  const router = useRouter();
+  const [user, setUser] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setUser(currentSession()?.username ?? null);
+    read();
+    return onSessionChange(read);
+  }, [pathname]);
 
   return (
     <header className="no-print border-b border-line bg-surface">
@@ -50,6 +59,23 @@ export function SiteHeader() {
           >
             Giới hạn đã biết
           </Link>
+          {user && (
+            <span className="flex items-center gap-2 text-[14px] font-normal text-muted">
+              <span>
+                Đăng nhập: <span className="font-medium text-ink">{user}</span>
+              </span>
+              <button
+                type="button"
+                className="text-accent underline underline-offset-4 hover:no-underline"
+                onClick={() => {
+                  clearSession();
+                  router.push("/login");
+                }}
+              >
+                Đăng xuất
+              </button>
+            </span>
+          )}
         </nav>
       </div>
       {runId ? (

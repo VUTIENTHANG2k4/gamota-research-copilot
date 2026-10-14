@@ -428,9 +428,7 @@ export default function MemoPage() {
         </div>
         {memo && (
           <div className="flex flex-wrap gap-2">
-            <a href={api.exportDocxUrl(run.id)} className="btn btn-secondary" download>
-              Tải Word
-            </a>
+            <DocxButton runId={run.id} />
             <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
               Lưu thành PDF
             </button>
@@ -465,5 +463,38 @@ export default function MemoPage() {
         </div>
       </Workspace>
     </div>
+  );
+}
+
+
+function DocxButton({ runId }: { runId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="flex flex-col">
+      <button
+        type="button"
+        className="btn btn-secondary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await api.downloadDocx(runId);
+          } catch (e) {
+            setError(e instanceof ApiHttpError ? `HTTP ${e.status}: ${e.detail}` : "Không tải được tệp Word từ máy chủ.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Đang tạo Word..." : "Tải Word"}
+      </button>
+      {error && (
+        <span role="alert" className="mt-1 text-[13px] text-danger-text">
+          {error}
+        </span>
+      )}
+    </span>
   );
 }

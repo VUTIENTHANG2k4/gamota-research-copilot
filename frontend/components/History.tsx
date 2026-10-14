@@ -56,7 +56,10 @@ function Row({ r, onDeleted }: { r: RunSummary; onDeleted: () => void }) {
             {MEMO_STATUS_VI[r.memo_status]}
           </Chip>
         )}
-        <span className="text-[13px] text-muted">{formatDateTime(r.created_at)}</span>
+        <span className="text-[13px] text-muted">
+          {formatDateTime(r.created_at)}
+          {r.created_by && <> · người hỏi: {r.created_by}</>}
+        </span>
         {r.parent_id && (
           <span className="text-[13px] text-muted">
             · làm rõ từ{" "}

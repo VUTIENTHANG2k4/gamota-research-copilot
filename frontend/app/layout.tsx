@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
+import { AuthGate } from "@/components/AuthGate";
 import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" className={`${inter.variable} ${plexMono.variable}`}>
       <body className="min-h-screen">
         <SiteHeader />
-        <main id="main">{children}</main>
+        <main id="main">
+          <AuthGate>{children}</AuthGate>
+        </main>
         <footer className="no-print mx-auto mt-4 w-full max-w-[1360px] px-4 pb-10 text-[13px] text-muted sm:px-8">
           Bản MVP/prototype do AI hỗ trợ soạn. Mọi con số lấy từ máy chủ và kho 30 tài liệu cố định; tài liệu SYNTHETIC là
           tài liệu tự soạn để thử hệ thống, không dùng để kết luận.

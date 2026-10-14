@@ -67,7 +67,7 @@ Báo cáo kiểm thử bằng tiếng Việt nằm trong `backend/tests/reports/
 - Đây là prototype: kết quả phải được người dùng đối chiếu với đoạn trích gốc trước khi dùng.
 - Kho nguồn chỉ có 30 tài liệu cố định; câu hỏi ngoài phạm vi sẽ nhận "Chưa đủ căn cứ".
 - Tài liệu `SYNTHETIC` chỉ để thử các tình huống bẫy, không dùng để rút kết luận về thị trường thật.
-- Sản phẩm chưa có đăng nhập: ai có link đều chạy được câu hỏi và dùng hạn mức mô hình của người triển khai.
+- Đăng nhập đơn giản: tài khoản và mật khẩu do người triển khai khai báo trong biến môi trường `APP_USERS`; không có đăng ký, quên mật khẩu hay phân quyền, mọi người dùng chung một lịch sử. Đủ để chặn người lạ dùng hạn mức mô hình, không phải bảo mật cho dữ liệu thật. Nếu không đặt `APP_USERS`, sản phẩm mở cho mọi người.
 - Endpoint miễn phí `:free` của mô hình có ghi log sử dụng; chỉ gửi tài liệu công khai và SYNTHETIC, không gửi dữ liệu thật của Gamota.
 
 Danh sách đầy đủ có ở trang "Giới hạn đã biết" trong giao diện.

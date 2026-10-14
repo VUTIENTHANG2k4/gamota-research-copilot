@@ -222,12 +222,12 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
           <GradeBadge grade={claim.grade} />
           {claim.review === "rejected" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-danger-text/50 bg-danger-bg px-2 py-0.5 text-[13px] font-semibold text-danger-text">
-              <Icon name="x" size={13} /> đã loại khỏi memo
+              <Icon name="x" size={13} /> đã loại khỏi memo{claim.reviewed_by ? ` (bởi ${claim.reviewed_by})` : ""}
             </span>
           )}
           {claim.review === "confirmed" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-ok-text/40 bg-ok-bg px-2 py-0.5 text-[13px] font-semibold text-ok-text">
-              <Icon name="check" size={13} /> đã xác nhận
+              <Icon name="check" size={13} /> đã xác nhận{claim.reviewed_by ? ` (bởi ${claim.reviewed_by})` : ""}
             </span>
           )}
           {claim.is_synthetic && <SyntheticTag />}

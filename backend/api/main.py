@@ -3,15 +3,16 @@ Runs, review decisions and history live in PostgreSQL. Only app/llm.py talks to 
 import csv
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from api import export, service, store
+from api import auth, export, service, store
 
 ROOT = Path(__file__).resolve().parent.parent
 INGEST = {"state": "starting", "chunks": 0, "error": None}
@@ -69,7 +70,7 @@ def need_run(run_id: str) -> dict:
 
 
 def view(run: dict) -> dict:
-    out = {k: run[k] for k in ("id", "question", "parent_id", "status", "stage", "error", "created_at", "finished_at",
+    out = {k: run[k] for k in ("id", "question", "parent_id", "created_by", "status", "stage", "error", "created_at", "finished_at",
                                 "brief", "memo", "memo_status", "memo_error", "memo_generated_at")}
     out["subs"], out["review_summary"] = [], {"confirmed": 0, "rejected": 0}
     if run["p3"]:
@@ -99,9 +100,37 @@ class ReviewIn(BaseModel):
     state: Literal["confirmed", "rejected", "none"]
 
 
+class LoginIn(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=200)
+
+
+User = Depends(auth.require_user)  # signed-in username; None when sign-in is off (APP_USERS empty)
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "mode": "MVP / prototype", "corpus": INGEST}
+
+
+@app.get("/api/auth/config")
+def auth_config():
+    return {"enabled": auth.enabled()}
+
+
+@app.post("/api/auth/login")
+def login(req: LoginIn):
+    if not auth.enabled():
+        raise HTTPException(409, "Đăng nhập chưa được bật trên máy chủ này.")
+    if not auth.check_password(req.username.strip(), req.password):
+        time.sleep(auth.FAIL_DELAY_S)
+        raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu.")
+    return auth.issue(req.username.strip())
+
+
+@app.get("/api/auth/me")
+def me(user: str | None = User):
+    return {"username": user, "enabled": auth.enabled()}
 
 
 @app.get("/api/about")
@@ -112,42 +141,42 @@ def about():
             "limitations": export.LIMITATIONS + [
                 "Bước duyệt claim của chuyên viên chỉ loại hoặc xác nhận claim; việc viết lại memo cần bấm 'Viết lại memo' và dùng model.",
                 "Xuất PDF dùng chức năng in của trình duyệt (Lưu thành PDF); xuất Word do máy chủ tạo.",
-                "Ai có đường dẫn cũng có thể chạy câu hỏi mới và dùng hạn mức model của người triển khai (chưa có xác thực).",
+                "Đăng nhập đơn giản: tài khoản và mật khẩu do người triển khai khai báo trên máy chủ, không có đăng ký, quên mật khẩu hay phân quyền; mọi người dùng chung một lịch sử. Không phải bảo mật cho dữ liệu thật.",
                 "Model :free của NVIDIA ghi log sử dụng: chỉ nhập câu hỏi và dùng tài liệu công khai, không nhập dữ liệu thật của Gamota hoặc dữ liệu cá nhân."]}
 
 
 @app.get("/api/runs")
-def list_runs():
+def list_runs(user: str | None = User):
     return store.list_runs()
 
 
 @app.post("/api/runs", status_code=202)
-def start_run(req: QuestionIn):
+def start_run(req: QuestionIn, user: str | None = User):
     if INGEST["state"] != "ready":
         raise HTTPException(503, "Kho tài liệu chưa sẵn sàng (đang nạp). Hãy thử lại sau ít phút.")
     try:
         service.reserve_slot()
     except service.Busy as e:
         raise HTTPException(429, str(e))
-    run_id = store.create_run(req.question.strip())
+    run_id = store.create_run(req.question.strip(), created_by=user)
     service.start(service.run_job, run_id)
     return {"id": run_id}
 
 
 @app.get("/api/runs/{run_id}")
-def get_run(run_id: str):
+def get_run(run_id: str, user: str | None = User):
     return view(need_run(run_id))
 
 
 @app.delete("/api/runs/{run_id}")
-def delete_run(run_id: str):
+def delete_run(run_id: str, user: str | None = User):
     need_run(run_id)
     store.delete_run(run_id)
     return {"deleted": run_id}
 
 
 @app.post("/api/runs/{run_id}/clarify", status_code=202)
-def clarify(run_id: str, req: ClarifyIn):
+def clarify(run_id: str, req: ClarifyIn, user: str | None = User):
     run = need_run(run_id)
     if run["status"] != "needs_clarification":
         raise HTTPException(409, "Lần chạy này không đang chờ làm rõ.")
@@ -155,22 +184,22 @@ def clarify(run_id: str, req: ClarifyIn):
         service.reserve_slot()
     except service.Busy as e:
         raise HTTPException(429, str(e))
-    new_id = store.create_run(f"{run['question']} (Làm rõ: {req.answer.strip()})"[:900], parent_id=run_id)
+    new_id = store.create_run(f"{run['question']} (Làm rõ: {req.answer.strip()})"[:900], parent_id=run_id, created_by=user)
     service.start(service.run_job, new_id)
     return {"id": new_id}
 
 
 @app.put("/api/runs/{run_id}/claims/{claim_id}/review")
-def review(run_id: str, claim_id: str, req: ReviewIn):
+def review(run_id: str, claim_id: str, req: ReviewIn, user: str | None = User):
     run = need_run(run_id)
     if not run["p3"] or claim_id not in {c["claim_id"] for s in run["p3"]["subs"] for c in s["claims"]}:
         raise HTTPException(404, "Không có claim này trong lần chạy.")
-    store.set_review(run_id, claim_id, req.state)
+    store.set_review(run_id, claim_id, req.state, user)
     return view(need_run(run_id))
 
 
 @app.post("/api/runs/{run_id}/memo", status_code=202)
-def rewrite_memo(run_id: str):
+def rewrite_memo(run_id: str, user: str | None = User):
     run = need_run(run_id)
     if not run["p3"]:
         raise HTTPException(409, "Chưa có kết quả để viết memo.")
@@ -186,7 +215,7 @@ def rewrite_memo(run_id: str):
 
 
 @app.get("/api/runs/{run_id}/export.docx")
-def export_docx(run_id: str):
+def export_docx(run_id: str, user: str | None = User):
     run = need_run(run_id)
     if not run["memo"]:
         raise HTTPException(409, "Chưa có memo để xuất.")
@@ -198,7 +227,7 @@ def export_docx(run_id: str):
 
 
 @app.get("/api/chunks/{chunk_id}")
-def get_chunk(chunk_id: str):
+def get_chunk(chunk_id: str, user: str | None = User):
     from app import db
     try:
         with db.connect() as conn:
@@ -213,5 +242,5 @@ def get_chunk(chunk_id: str):
 
 
 @app.get("/api/sources")
-def list_sources():
+def list_sources(user: str | None = User):
     return list(sources().values())

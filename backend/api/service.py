@@ -29,6 +29,7 @@ def apply_reviews(p3: dict, reviews: dict[str, dict]) -> dict:
     for s in out["subs"]:
         for c in s["claims"]:
             c["review"] = reviews.get(c["claim_id"], {}).get("state", "none")
+            c["reviewed_by"] = reviews.get(c["claim_id"], {}).get("reviewed_by")
         kept = [c for c in s["claims"] if c["claim_id"] not in rejected]
         ids = {c["claim_id"] for c in kept}
         s["conflicts"] = [x for x in s["conflicts"] if x["claim_a"] in ids and x["claim_b"] in ids]

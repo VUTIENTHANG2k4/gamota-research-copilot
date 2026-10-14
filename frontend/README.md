@@ -15,6 +15,8 @@ Pages: `/` (question box and history), `/runs/{id}` (Brief), `/runs/{id}/evidenc
 
 The backend must allow the UI origin in `CORS_ORIGINS` (or `CORS_ORIGIN_REGEX`), see `docs/api.md`.
 
+Sign-in: when the backend has `APP_USERS` set, every page except `/login` and `/limitations` asks the user to sign in (`components/AuthGate.tsx`, session in `lib/auth.ts`, kept in `localStorage`). A 401 from the API clears the session and returns to `/login`. With `APP_USERS` empty the UI behaves as before.
+
 ## Run locally
 
 1. PostgreSQL: `docker compose up -d` from the repo root.

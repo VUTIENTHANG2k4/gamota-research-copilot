@@ -1,6 +1,8 @@
 // Typed client for the FastAPI backend (contract: docs/api.md).
 // The UI reads data ONLY from this API. It never calls OpenRouter and holds no API keys.
 
+import { clearSession, currentSession, redirectToLogin, type Session } from "./auth";
+
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 export type Level = "High" | "Medium" | "Low" | "Chưa đủ căn cứ";
@@ -13,6 +15,7 @@ export interface RunSummary {
   id: string;
   question: string;
   parent_id: string | null;
+  created_by: string | null;
   status: RunStatus;
   stage: string;
   error: string | null;
@@ -78,6 +81,7 @@ export interface Claim {
   src_data_date: string;
   src_publish_date: string;
   review: ReviewState;
+  reviewed_by?: string | null;
   source: SourceMeta;
 }
 
@@ -152,6 +156,7 @@ export interface Run {
   id: string;
   question: string;
   parent_id: string | null;
+  created_by: string | null;
   created_at: string;
   finished_at: string | null;
   status: RunStatus;
@@ -206,13 +211,32 @@ export class ApiHttpError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function authHeaders(): Record<string, string> {
+  const s = currentSession();
+  return s ? { Authorization: `Bearer ${s.token}` } : {};
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...init });
+    res = await fetch(`${API_URL}${path}`, {
+      cache: "no-store",
+      ...init,
+      headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
+    });
   } catch {
     throw new ApiUnreachableError();
   }
+  if (res.status === 401 && path !== "/api/auth/login") {
+    // missing or expired session: sign in again, then come back here
+    clearSession();
+    redirectToLogin();
+  }
+  return res;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await send(path, init);
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -238,6 +262,9 @@ function sendJson<T>(method: string, path: string, body?: unknown): Promise<T> {
 const enc = encodeURIComponent;
 
 export const api = {
+  authConfig: () => request<{ enabled: boolean }>("/api/auth/config"),
+  login: (username: string, password: string) =>
+    sendJson<Session>("POST", "/api/auth/login", { username, password }),
   health: () => request<Health>("/api/health"),
   about: () => request<About>("/api/about"),
   runs: () => request<RunSummary[]>("/api/runs"),
@@ -249,5 +276,25 @@ export const api = {
     sendJson<Run>("PUT", `/api/runs/${enc(id)}/claims/${enc(claimId)}/review`, { state }),
   rewriteMemo: (id: string) => sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/memo`),
   chunk: (id: string) => request<ChunkResponse>(`/api/chunks/${enc(id)}`),
-  exportDocxUrl: (id: string) => `${API_URL}/api/runs/${enc(id)}/export.docx`,
+  /** Word export needs the session header, so it is fetched and saved instead of opened as a plain link. */
+  downloadDocx: async (id: string) => {
+    const res = await send(`/api/runs/${enc(id)}/export.docx`);
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        detail = (await res.json())?.detail ?? detail;
+      } catch {
+        /* keep statusText */
+      }
+      throw new ApiHttpError(res.status, String(detail));
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `memo-${id}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

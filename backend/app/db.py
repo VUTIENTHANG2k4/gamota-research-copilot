@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     state text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (run_id, claim_id)
 );
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS created_by text;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS reviewed_by text;
 """
 
 
