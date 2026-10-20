@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import type { Grade, Level, ReviewState } from "@/lib/api";
-import { GRADE_TONE, levelVi } from "@/lib/text";
+import type { Answers, Grade, Level, ReviewState, Tier } from "@/lib/api";
+import { ANSWERS_VI, GRADE_TONE, TIER_VI, levelVi } from "@/lib/text";
 
 /* Stroke SVG icons (no emoji). All are decorative: the adjacent text carries the meaning. */
-type IconName = "check" | "x" | "dashed-circle" | "alert" | "info" | "external" | "flask";
+type IconName = "check" | "x" | "dashed-circle" | "alert" | "info" | "external" | "flask" | "clock" | "search" | "branch" | "star";
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   const common = {
@@ -34,6 +34,14 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
       return <svg {...common}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>;
     case "flask":
       return <svg {...common}><path d="M9 3h6M10 3v6l-5.5 9.5A1.5 1.5 0 005.8 21h12.4a1.5 1.5 0 001.3-2.5L14 9V3" /></svg>;
+    case "clock":
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+    case "search":
+      return <svg {...common}><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>;
+    case "branch":
+      return <svg {...common}><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="9" r="2" /><path d="M6 7v10M18 11c0 4-6 3-11.2 6.6" /></svg>;
+    case "star":
+      return <svg {...common}><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" /></svg>;
   }
 }
 
@@ -132,6 +140,53 @@ export function LevelBadge({ level, className = "" }: { level: Level; className?
       {level === "Chưa đủ căn cứ" && <Icon name="dashed-circle" size={14} />}
       {level === "Low" && <Icon name="alert" size={14} />}
       Mức: {levelVi(level)}
+    </span>
+  );
+}
+
+const TIER_TONE: Record<Tier, string> = {
+  supported: TONE.ok,
+  uncertain: TONE.warn,
+  refused: `${TONE.danger} border-dashed`,
+};
+
+/** Mission 3 tier: "Có thể tin" / "Chưa chắc chắn" / "Chưa có căn cứ". Always text, never colour only. */
+export function TierBadge({ tier, className = "" }: { tier: Tier; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.5 text-[13px] font-semibold ${TIER_TONE[tier]} ${className}`}>
+      <Icon name={tier === "supported" ? "check" : tier === "uncertain" ? "alert" : "dashed-circle"} size={14} />
+      {TIER_VI[tier]}
+    </span>
+  );
+}
+
+/** Marks a sub-question that directly answers the original question. */
+export function CoreBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded border border-accent px-1.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-accent ${className}`}
+      title="Câu hỏi con trả lời trực tiếp câu hỏi gốc; nếu nó chưa có căn cứ thì câu hỏi gốc chưa có kết luận"
+    >
+      <Icon name="star" size={12} />
+      câu hỏi con chính
+    </span>
+  );
+}
+
+const ANSWERS_TONE: Record<Answers, string> = {
+  direct: TONE.ok,
+  partial: TONE.warn,
+  context: TONE.neutral,
+};
+
+/** How directly a claim answers its sub-question (label by the model, used by code). */
+export function AnswersTag({ answers, reason }: { answers: Answers; reason?: string | null }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[12px] font-semibold ${ANSWERS_TONE[answers]}`}
+      title={reason ?? undefined}
+    >
+      {ANSWERS_VI[answers]}
     </span>
   );
 }

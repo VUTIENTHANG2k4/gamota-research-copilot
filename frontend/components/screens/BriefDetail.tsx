@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRun } from "@/components/RunProvider";
-import { SectionLabel } from "@/components/ui";
+import { CoreBadge, SectionLabel } from "@/components/ui";
+import { FollowupBanner } from "@/components/Followup";
 import { EmptyState } from "@/components/states";
 import { api, ApiHttpError, type RunSummary } from "@/lib/api";
 import { errorText } from "@/lib/text";
@@ -106,6 +107,8 @@ export default function BriefPage() {
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">{run.question}</h1>
       </div>
 
+      <FollowupBanner run={run} />
+
       {run.status === "needs_clarification" ? (
         <section className="card border-2 border-warn-border" aria-labelledby="clar-h">
           <SectionLabel>Cần làm rõ câu hỏi</SectionLabel>
@@ -157,12 +160,21 @@ export default function BriefPage() {
               <ol className="mt-4 space-y-3">
                 {brief.sub_questions.map((s) => (
                   <li key={s.id} className="rounded-lg border border-line bg-subtle p-4">
-                    <span className="font-mono text-[13px] font-medium text-accent">{s.id}</span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-[13px] font-medium text-accent">{s.id}</span>
+                      {s.core && <CoreBadge />}
+                    </span>
                     <p className="mt-1 text-[16px]">{s.text}</p>
                   </li>
                 ))}
               </ol>
             )}
+            {brief.sub_questions.some((s) => s.core) ? (
+              <p className="mt-3 text-[13px] text-muted">
+                Câu hỏi con chính trả lời trực tiếp câu hỏi gốc: chỉ cần một câu hỏi con chính &quot;Chưa đủ căn cứ&quot; là câu
+                hỏi gốc chưa có kết luận. Các câu hỏi con khác là phụ.
+              </p>
+            ) : null}
           </section>
 
           {brief.clarifying_questions.length > 0 && (

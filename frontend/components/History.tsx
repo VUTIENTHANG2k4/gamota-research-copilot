@@ -62,7 +62,8 @@ function Row({ r, onDeleted }: { r: RunSummary; onDeleted: () => void }) {
         </span>
         {r.parent_id && (
           <span className="text-[13px] text-muted">
-            · làm rõ từ{" "}
+            {/* clarify runs carry "(Làm rõ: ...)" in their question (api/main.py); other children are follow-ups */}
+            · {r.question.includes("(Làm rõ:") ? "làm rõ từ" : "nghiên cứu tiếp từ"}{" "}
             <Link href={`/runs/${encodeURIComponent(r.parent_id)}`} className="text-accent underline">lần chạy trước</Link>
           </span>
         )}

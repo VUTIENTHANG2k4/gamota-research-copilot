@@ -1,15 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRun } from "@/components/RunProvider";
-import { Icon, LevelBadge, SectionLabel, SyntheticTag, toneClass } from "@/components/ui";
+import { CoreBadge, Icon, LevelBadge, SectionLabel, SyntheticTag, TierBadge, toneClass } from "@/components/ui";
 import { EmptyState } from "@/components/states";
 import { Inline } from "@/components/Markdown";
 import { RunProgress } from "@/components/RunProgress";
 import { SyntheticNote } from "@/components/SyntheticNote";
+import { FollowupBanner, FollowupBox } from "@/components/Followup";
 import { ClaimRef, Workspace } from "@/components/Workspace";
-import { api, ApiHttpError, type Level, type Memo, type MemoPoint, type MemoSub, type Run, type Verdict } from "@/lib/api";
-import { LEVEL_ORDER, causeVi, errorText, formatDateTime, levelVi } from "@/lib/text";
+import {
+  api,
+  ApiHttpError,
+  type Level,
+  type Memo,
+  type MemoClaimRef,
+  type MemoPoint,
+  type MemoSub,
+  type Run,
+  type Tier,
+  type Verdict,
+} from "@/lib/api";
+import {
+  LEVEL_ORDER,
+  TIER_ORDER,
+  causeVi,
+  coreIds,
+  errorText,
+  formatDateTime,
+  historyVi,
+  levelVi,
+  tierOf,
+  uncertainVi,
+} from "@/lib/text";
 import { useAbout } from "@/lib/useAbout";
 
 const BAND_CELL: Record<Level, string> = {
@@ -107,12 +131,133 @@ function NotEnough({ sub }: { sub: MemoSub }) {
   );
 }
 
-function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; current?: Verdict }) {
-  const refused = sub.verdict.level === "Chưa đủ căn cứ" || sub.refused_text !== null;
+/** Main evidence: the A/B claims the conclusion rests on. Each item opens its source passage. */
+function MainEvidence({ items }: { items: MemoClaimRef[] }) {
   return (
-    <section className="border-t border-line pt-6" aria-labelledby={`m-${sub.id}`}>
+    <div className="rounded-lg border border-ok-text/40 bg-ok-bg/40 p-3">
+      <p className="flex items-center gap-1.5 font-semibold text-ok-text">
+        <Icon name="check" size={16} /> Bằng chứng chính ({items.length})
+      </p>
+      <p className="text-[13px] text-muted">Claim hạng A/B, còn trong hạn, dùng làm căn cứ. Bấm mã claim để xem đoạn gốc.</p>
+      <ul className="mt-2 space-y-2">
+        {items.map((c) => (
+          <li key={c.claim_id} className="flex flex-col gap-1 rounded border border-line bg-surface p-2 min-[620px]:flex-row min-[620px]:items-start min-[620px]:justify-between">
+            <div className="min-w-0 text-[14px]">
+              <p>{c.content}</p>
+              <p className="font-mono text-[12.5px] text-muted break-words">{c.citation}</p>
+            </div>
+            <div className="shrink-0"><ClaimRef id={c.claim_id} /></div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Why the sub-question is not yet "Có thể tin": code reasons, in plain Vietnamese. */
+function UncertainList({ items }: { items: NonNullable<MemoSub["uncertain"]> }) {
+  return (
+    <div className="rounded-lg border-2 border-warn-border bg-warn-bg/60 p-3 text-warn-text">
+      <p className="flex items-center gap-1.5 font-semibold">
+        <Icon name="alert" size={16} /> Điểm chưa chắc chắn và lý do ({items.length})
+      </p>
+      <ul className="mt-2 space-y-2">
+        {items.map((u, i) => (
+          <li key={i} className="rounded border border-warn-border/60 bg-surface p-2 text-[14px] text-ink">
+            <p>
+              <strong>{uncertainVi(u.code)}:</strong> {u.text}
+            </p>
+            {u.claim_ids.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="text-[13px] text-muted">Claim liên quan:</span>
+                {u.claim_ids.map((id) => <ClaimRef key={id} id={id} />)}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Old figures kept only as history. Deliberately different from conclusions: dashed frame, date first, no bold claim. */
+function HistoryList({ items }: { items: NonNullable<MemoSub["history"]> }) {
+  return (
+    <div className="rounded-lg border-[1.5px] border-dashed border-ink/60 bg-subtle p-3">
+      <p className="flex items-center gap-1.5 font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-ink">
+        <Icon name="clock" size={15} /> Số liệu lịch sử: không dùng làm kết luận ({items.length})
+      </p>
+      <ul className="mt-2 space-y-2">
+        {items.map((h) => (
+          <li key={h.claim_id} className="rounded border border-line bg-surface p-2 text-[14px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded border border-ink/60 px-1.5 font-mono text-[12px] font-medium tabular">dữ liệu {h.data_date}</span>
+              <span className="rounded border border-ink/60 px-1.5 text-[12px] font-semibold uppercase tracking-[0.04em]">{historyVi(h.code)}</span>
+              <ClaimRef id={h.claim_id} />
+            </div>
+            <p className="mt-1.5 text-muted">
+              <span className="font-medium text-ink">Con số cũ, chỉ để tham khảo: </span>&ldquo;{h.content}&rdquo;
+            </p>
+            <p className="mt-0.5 text-[13px]">{h.text}</p>
+            <p className="font-mono text-[12px] text-muted break-words">{h.citation}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function NextSteps({ items, subId, runId, refused }: { items: string[]; subId: string; runId: string; refused: boolean }) {
+  return (
+    <div className="rounded-lg border border-accent/60 bg-surface p-3">
+      <p className="flex items-center gap-1.5 font-semibold text-accent">
+        <Icon name="search" size={16} /> Nên tìm tiếp ở đâu
+      </p>
+      {items.length === 0 ? (
+        <p className="mt-1 text-[14px] text-muted">Code không đề xuất hướng tìm nào cho câu hỏi con này.</p>
+      ) : (
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-[14px]">
+          {items.map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      )}
+      {refused && (
+        <p className="no-print mt-2 text-[13px]">
+          <Link href={`/runs/${encodeURIComponent(runId)}/evidence#sub-${subId}`} className="font-semibold text-accent underline">
+            Xem hệ thống đã tìm những tài liệu nào cho câu hỏi con này
+          </Link>{" "}
+          (để phân biệt &quot;kho không có&quot; với &quot;có thể tìm sót&quot;).
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SubBlock({
+  sub,
+  index,
+  current,
+  core,
+  m3,
+  runId,
+}: {
+  sub: MemoSub;
+  index: number;
+  current?: Verdict;
+  core: boolean;
+  m3: boolean;
+  runId: string;
+}) {
+  const refused = sub.verdict.level === "Chưa đủ căn cứ" || sub.refused_text !== null;
+  const tier = sub.tier ?? tierOf(sub.verdict);
+  const history = sub.history ?? [];
+  const historyIds = new Set(history.map((h) => h.claim_id));
+  const refSignals = sub.reference_signals_cd.filter((s) => !historyIds.has(s.claim_id));
+  return (
+    <section id={`m-sub-${sub.id}`} className="scroll-mt-4 border-t border-line pt-6" aria-labelledby={`m-${sub.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="label-mono">{index}. {sub.id}</span>
+        {m3 && core && <CoreBadge />}
+        {m3 && <TierBadge tier={tier} />}
         <LevelBadge level={sub.verdict.level} />
       </div>
       <h3 id={`m-${sub.id}`} className="mt-1 text-[18px] font-semibold leading-snug">{sub.text}</h3>
@@ -141,6 +286,9 @@ function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; curren
           </ul>
         )}
 
+        {sub.main_evidence && sub.main_evidence.length > 0 && <MainEvidence items={sub.main_evidence} />}
+        {sub.uncertain && sub.uncertain.length > 0 && <UncertainList items={sub.uncertain} />}
+
         {sub.conflicts.length > 0 && (
           <div className="rounded-lg border border-warn-border bg-warn-bg/60 p-3">
             <p className="font-semibold text-warn-text">Mâu thuẫn giữa các nguồn ({sub.conflicts.length})</p>
@@ -158,6 +306,9 @@ function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; curren
                     <span className={c.status === "unexplained" ? "font-bold text-danger-text" : ""}>
                       {c.status === "explained" ? "đã giải thích nguyên nhân" : "CHƯA giải thích được"}
                     </span>
+                    {c.decided_by && (
+                      <span className="text-muted"> · {c.decided_by === "code" ? "code xếp loại" : "AI gán nguyên nhân"}</span>
+                    )}
                     {c.synthetic_involved && <> <SyntheticTag className="align-middle" /></>}
                   </p>
                 </li>
@@ -167,14 +318,16 @@ function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; curren
           </div>
         )}
 
-        {sub.reference_signals_cd.length > 0 && (
+        {history.length > 0 && <HistoryList items={history} />}
+
+        {refSignals.length > 0 && (
           <div className="rounded-lg border border-line bg-subtle p-3">
             <p className="font-semibold">Tín hiệu tham khảo hạng C/D</p>
             <p className="text-[13px] text-muted">
               Nguồn yếu: không đủ làm căn cứ kết luận, chỉ để tham khảo.
             </p>
             <ul className="mt-2 space-y-2">
-              {sub.reference_signals_cd.map((s) => (
+              {refSignals.map((s) => (
                 <li key={s.claim_id} className="flex flex-col gap-1 min-[620px]:flex-row min-[620px]:items-start min-[620px]:justify-between">
                   <div className="min-w-0 text-[14px]">
                     <p>{s.content}</p>
@@ -186,7 +339,73 @@ function SubBlock({ sub, index, current }: { sub: MemoSub; index: number; curren
             </ul>
           </div>
         )}
+
+        {m3 && <NextSteps items={sub.next_steps ?? []} subId={sub.id} runId={runId} refused={refused} />}
       </div>
+    </section>
+  );
+}
+
+/** Top summary: the sub-questions grouped by what can be trusted (tiers computed by code). */
+function TrustSummary({ memo, core, coreMarked }: { memo: Memo; core: Set<string>; coreMarked: boolean }) {
+  const byId = new Map(memo.subs.map((s) => [s.id, s]));
+  const tiers: Record<Tier, string[]> =
+    memo.tiers ??
+    (Object.fromEntries(TIER_ORDER.map((t) => [t, memo.subs.filter((s) => tierOf(s.verdict) === t).map((s) => s.id)])) as Record<Tier, string[]>);
+  const frame: Record<Tier, string> = {
+    supported: "border-ok-text/50",
+    uncertain: "border-warn-border",
+    refused: "border-danger-text border-dashed",
+  };
+  const meaning: Record<Tier, string> = {
+    supported: "Từ 2 nguồn A/B độc lập trở lên, số liệu còn trong hạn, không có mâu thuẫn.",
+    uncertain: "Có căn cứ hạng A/B nhưng còn lý do phải dè dặt (xem từng câu hỏi con).",
+    refused: "Không có claim hạng A/B dùng được: hệ thống không viết kết luận, không ước lượng.",
+  };
+  return (
+    <section aria-labelledby="tiers-h">
+      <SectionLabel>Tóm tắt: điều gì tin được</SectionLabel>
+      <h2 id="tiers-h" className="sr-only">Tóm tắt theo mức tin cậy</h2>
+      <div className="mt-2 grid gap-3 min-[900px]:grid-cols-3">
+        {TIER_ORDER.map((t) => (
+          <div key={t} className={`rounded-lg border-2 bg-surface p-3 ${frame[t]}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <TierBadge tier={t} />
+              <span className="text-[14px] font-semibold tabular">{tiers[t]?.length ?? 0} câu hỏi con</span>
+            </div>
+            <p className="mt-1 text-[13px] text-muted">{meaning[t]}</p>
+            {(tiers[t] ?? []).length === 0 ? (
+              <p className="mt-2 text-[14px] font-medium">Không có câu hỏi con nào.</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {tiers[t].map((id) => {
+                  const s = byId.get(id);
+                  return (
+                    <li key={id} className="text-[14px]">
+                      <a href={`#m-sub-${id}`} className="group block rounded px-1 py-0.5 hover:bg-subtle">
+                        <span className="font-mono text-[13px] font-medium text-accent">{id}</span>
+                        {coreMarked && core.has(id) && <span className="ml-1.5 align-middle"><CoreBadge /></span>}
+                        <span className="block group-hover:underline">{s?.text ?? "(không có trong memo)"}</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+      {!memo.tiers && (
+        <p className="mt-2 text-[13px] text-muted">
+          Memo này được viết trước khi có phân nhóm; nhóm ở trên được suy ra từ mức chắc chắn của từng câu hỏi con theo cùng
+          quy tắc của máy chủ (Cao = có thể tin, Trung bình/Thấp = chưa chắc chắn).
+        </p>
+      )}
+      {memo.tiers && !coreMarked && (
+        <p className="mt-2 text-[13px] text-muted">
+          Lần chạy này không đánh dấu câu hỏi con chính, nên khi tính mức tổng thể mọi câu hỏi con đều được tính là chính.
+        </p>
+      )}
     </section>
   );
 }
@@ -207,11 +426,14 @@ function ListSection({ title, items, empty }: { title: string; items: string[]; 
 }
 
 function MemoView({ memo, run }: { memo: Memo; run: Run }) {
+  // Mission 3 memos carry tiers; the overall level then already counts refused core sub-questions (backend rule).
+  const m3 = !!memo.tiers;
+  const { ids: core, marked: coreMarked } = coreIds(run);
   const total = memo.subs.length;
   const refusedCount = memo.subs.filter((s) => s.verdict.level === "Chưa đủ căn cứ").length;
   const noPoints = memo.subs.filter((s) => s.verdict.level !== "Chưa đủ căn cứ" && s.points.length === 0).length;
   const note =
-    memo.overall.level !== "Chưa đủ căn cứ" && refusedCount > 0
+    !m3 && memo.overall.level !== "Chưa đủ căn cứ" && refusedCount > 0
       ? `${refusedCount}/${total} câu hỏi con ở trạng thái "Chưa đủ căn cứ". Mức tổng thể chỉ tính các phần đã trả lời, nên hãy đọc nó cùng với các phần này: mức tổng thể có thể cao hơn thực tế.${
           noPoints > 0 ? ` Ngoài ra ${noPoints} câu hỏi con có mức nhưng chưa có câu kết luận nào.` : ""
         }`
@@ -235,20 +457,42 @@ function MemoView({ memo, run }: { memo: Memo; run: Run }) {
         <div className="mt-2">
           <ConfidenceBand level={memo.overall.level} reason={memo.overall.reason} note={note} />
         </div>
+        {m3 && (
+          <p className="mt-2 text-[13px] text-muted">
+            Mức tổng thể do code tính trên các câu hỏi con chính: chỉ cần một câu hỏi con chính &quot;Chưa đủ căn cứ&quot; là câu
+            hỏi gốc chưa có kết luận.
+          </p>
+        )}
       </section>
 
+      <TrustSummary memo={memo} core={core} coreMarked={coreMarked} />
+
       <div>
-        <SectionLabel>Kết luận theo câu hỏi con</SectionLabel>
+        <SectionLabel>Chi tiết theo câu hỏi con</SectionLabel>
         <div className="mt-4 space-y-6">
           {memo.subs.map((s, i) => (
-            <SubBlock key={s.id} sub={s} index={i + 1} current={run.subs.find((x) => x.id === s.id)?.verdict} />
+            <SubBlock
+              key={s.id}
+              sub={s}
+              index={i + 1}
+              current={run.subs.find((x) => x.id === s.id)?.verdict}
+              core={core.has(s.id)}
+              m3={m3}
+              runId={run.id}
+            />
           ))}
         </div>
       </div>
 
       <ListSection title="Khoảng trống dữ liệu" items={memo.gaps} empty="Memo không ghi khoảng trống nào." />
       <ListSection title="Giả định chính / điều có thể làm kết luận sai" items={memo.key_assumptions} empty="Memo không ghi giả định nào." />
-      <ListSection title="Bước xác minh tiếp theo" items={memo.next_steps} empty="Memo không đề xuất bước nào." />
+      {m3 ? (
+        <p className="border-t border-line pt-6 text-[14px] text-muted">
+          Hướng tìm tiếp (&quot;Nên tìm tiếp ở đâu&quot;) nằm trong từng câu hỏi con ở trên.
+        </p>
+      ) : (
+        <ListSection title="Bước xác minh tiếp theo" items={memo.next_steps} empty="Memo không đề xuất bước nào." />
+      )}
 
       <footer className="rounded-lg border border-ink/60 bg-subtle p-4 text-[14px]">
         <p className="font-semibold">Về memo này</p>
@@ -444,6 +688,8 @@ export default function MemoPage() {
 
       <div className="no-print"><SyntheticNote compact /></div>
 
+      <FollowupBanner run={run} />
+
       <MemoStatus run={run} onRewrite={rewrite} busy={busy} startError={startError} />
 
       <Workspace run={run}>
@@ -460,6 +706,7 @@ export default function MemoPage() {
               </EmptyState>
             )
           )}
+          <FollowupBox run={run} />
         </div>
       </Workspace>
     </div>

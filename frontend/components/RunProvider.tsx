@@ -169,8 +169,11 @@ export function RunProvider({ runId, children }: { runId: string; children: Reac
             Tạo lúc {formatDateTime(run.created_at)}
             {run.parent_id && (
               <>
-                {" · làm rõ từ "}
-                <Link href={`/runs/${encodeURIComponent(run.parent_id)}`} className="font-medium text-accent underline">
+                {run.context ? " · nghiên cứu tiếp từ " : " · làm rõ từ "}
+                <Link
+                  href={`/runs/${encodeURIComponent(run.parent_id)}${run.context ? "/memo" : ""}`}
+                  className="font-medium text-accent underline"
+                >
                   lần chạy trước
                 </Link>
               </>

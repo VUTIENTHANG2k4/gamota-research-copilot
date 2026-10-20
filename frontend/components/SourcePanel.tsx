@@ -3,8 +3,8 @@
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import { api, ApiHttpError, ApiUnreachableError, type Claim, type Run } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { GRADE_COMPONENTS, claimTypeVi, dateOrUnknown, sourceTypeVi } from "@/lib/text";
-import { GradeBadge, Icon, LevelBadge, SyntheticTag, SectionLabel } from "./ui";
+import { GRADE_COMPONENTS, claimTypeVi, dateOrUnknown, inheritedFrom, sourceTypeVi } from "@/lib/text";
+import { AnswersTag, GradeBadge, Icon, LevelBadge, SyntheticTag, SectionLabel } from "./ui";
 import { useRun } from "./RunProvider";
 import { Loading } from "./states";
 
@@ -112,6 +112,12 @@ function ReviewRow({ claim }: { claim: Claim }) {
         {state === "rejected" && "Claim này đã bị loại khỏi memo."}
         {state === "none" && "Chưa duyệt claim này."}
       </p>
+      {state !== "none" && inheritedFrom(claim.reviewed_by) && (
+        <p className="mt-1 text-[14px]">
+          Quyết định này được kế thừa từ lần chạy trước (<span className="font-mono">{inheritedFrom(claim.reviewed_by)}</span>),
+          không phải do bạn bấm ở lần chạy này. Bấm Hoàn tác nếu muốn xét lại.
+        </p>
+      )}
       {state === "rejected" && (
         <p className="mt-1 text-[14px] text-danger-text">
           Claim vẫn được hiển thị để bạn thấy, nhưng không còn được tính vào mức chắc chắn và sẽ không có trong memo viết lại.
@@ -187,6 +193,8 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
     ? run.subs.flatMap((s) => s.claims).filter((c) => c.origin_group === claim.origin_group).length
     : 0;
   const methodology = String(src.has_methodology).toLowerCase() === "true";
+  const parent = inheritedFrom(claim.reviewed_by);
+  const by = claim.reviewed_by ? (parent ? ` (kế thừa từ lần chạy ${parent})` : ` (bởi ${claim.reviewed_by})`) : "";
 
   let chunkText: string | null = null;
   let chunkProblem: ReactNode = null;
@@ -222,14 +230,15 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
           <GradeBadge grade={claim.grade} />
           {claim.review === "rejected" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-danger-text/50 bg-danger-bg px-2 py-0.5 text-[13px] font-semibold text-danger-text">
-              <Icon name="x" size={13} /> đã loại khỏi memo{claim.reviewed_by ? ` (bởi ${claim.reviewed_by})` : ""}
+              <Icon name="x" size={13} /> đã loại khỏi memo{by}
             </span>
           )}
           {claim.review === "confirmed" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-ok-text/40 bg-ok-bg px-2 py-0.5 text-[13px] font-semibold text-ok-text">
-              <Icon name="check" size={13} /> đã xác nhận{claim.reviewed_by ? ` (bởi ${claim.reviewed_by})` : ""}
+              <Icon name="check" size={13} /> đã xác nhận{by}
             </span>
           )}
+          {claim.answers && <AnswersTag answers={claim.answers} reason={claim.answers_reason} />}
           {claim.is_synthetic && <SyntheticTag />}
           {claim.claim_type !== "fact" && (
             <span className="rounded border border-dashed border-ink px-1.5 font-mono text-[11px] uppercase tracking-[0.06em]">
@@ -238,6 +247,12 @@ function ClaimDetail({ claim, run }: { claim: Claim; run: Run }) {
           )}
         </div>
         <p className="mt-2 text-[15px] font-medium">{claim.content}</p>
+        {claim.answers && claim.answers_reason && (
+          <p className="mt-1 text-[13px]">
+            <span className="font-semibold">Mức liên quan (AI gán nhãn): </span>
+            <span className="text-muted">{claim.answers_reason}</span>
+          </p>
+        )}
       </div>
 
       {claim.is_synthetic && (

@@ -9,6 +9,14 @@ import { ClaimRef, Workspace, useClaimSelection } from "@/components/Workspace";
 import type { Conflict } from "@/lib/api";
 import { causeVi, dateOrUnknown, splitBullets } from "@/lib/text";
 
+/** What each code-decided relation means for the reader (Mission 3). */
+const CAUSE_NOTE: Record<string, string> = {
+  revision: "Cùng một nguồn gốc đã ra bản mới hơn: con số của bản trước chỉ còn là lịch sử, không dùng làm kết luận.",
+  stale: "Một trong hai con số đã cũ so với thời hạn của loại dữ liệu này: con số cũ chỉ còn là lịch sử.",
+  weak_dissent:
+    "Nguồn yếu hơn (hạng C/D) cho con số khác nguồn hạng A/B: không làm hạ mức của kết luận, nhưng bạn cần biết để kiểm tra.",
+};
+
 interface Entry {
   conflict: Conflict;
   subIds: string[];
@@ -47,6 +55,7 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
   const c = e.conflict;
   const explained = c.status === "explained";
   const bullets = splitBullets(c.usage_suggestion || "");
+  const byCode = c.decided_by === "code";
   return (
     <article
       className={`card !p-5 sm:!p-6 ${explained ? "" : "border-2 border-danger-text"}`}
@@ -58,6 +67,15 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
           <Icon name={explained ? "check" : "alert"} size={14} />
           {explained ? "Đã giải thích nguyên nhân" : "Chưa giải thích được"}
         </span>
+        {c.decided_by && (
+          <span
+            className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[12px] font-semibold ${
+              byCode ? "border-ink/60 bg-subtle text-ink" : "border-dashed border-ink text-ink"
+            }`}
+          >
+            {byCode ? "Code xếp loại (theo ngày, nguồn gốc, hạng nguồn)" : "AI gán nguyên nhân"}
+          </span>
+        )}
         {c.synthetic_involved && <SyntheticTag />}
         {typeof c.relative_diff === "number" && (
           <span className="text-[13px] text-muted">
@@ -75,6 +93,7 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
         <div>
           <SectionLabel>Nguyên nhân</SectionLabel>
           <p className="mt-1 font-semibold">{causeVi(c.cause)}</p>
+          {CAUSE_NOTE[c.cause] && <p className="text-[14px]">{CAUSE_NOTE[c.cause]}</p>}
           {(c.llm_cause || c.recheck) && (
             <p className="text-[13px] text-muted">
               Nhãn AI gán: <span className="font-mono">{c.llm_cause ?? "không ghi"}</span> · kiểm lại bằng code:{" "}
@@ -85,10 +104,17 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
         </div>
         <div>
           <SectionLabel>Giải thích</SectionLabel>
-          <p className="mt-1"><Inline text={c.explanation} /></p>
-          <p className="mt-1 text-[13px] text-warn-text">
-            Do AI viết; có thể vượt quá bằng chứng trong kho. Hãy mở đoạn gốc của hai claim để kiểm tra.
-          </p>
+          <p className="mt-1"><Inline text={c.explanation || "Không có giải thích."} /></p>
+          {byCode ? (
+            <p className="mt-1 text-[13px] text-muted">
+              Câu giải thích do code viết theo quy tắc cố định từ ngày công bố, ngày dữ liệu, nguồn gốc và hạng nguồn; code
+              không đọc nội dung để hiểu vì sao hai con số khác nhau.
+            </p>
+          ) : (
+            <p className="mt-1 text-[13px] text-warn-text">
+              Do AI viết; có thể vượt quá bằng chứng trong kho. Hãy mở đoạn gốc của hai claim để kiểm tra.
+            </p>
+          )}
         </div>
         <div>
           <SectionLabel>Gợi ý dùng con số nào cho mục đích nào</SectionLabel>
@@ -97,7 +123,9 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
               {bullets.map((b, i) => <li key={i}><Inline text={b} /></li>)}
             </ul>
           ) : (
-            <p className="mt-1"><Inline text={c.usage_suggestion || "Không có gợi ý."} /></p>
+            <p className="mt-1">
+              <Inline text={c.usage_suggestion || (byCode ? "Không có gợi ý riêng; xem nguyên nhân và giải thích ở trên." : "Không có gợi ý.")} />
+            </p>
           )}
         </div>
       </div>
@@ -138,7 +166,9 @@ export default function ReconcilePage() {
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">Đối soát mâu thuẫn</h1>
         <p className="mt-2 text-muted">
           Hai claim cùng chủ đề nhưng con số lệch nhau (code tìm cặp lệch từ 10% trở lên). Mỗi cặp có nguyên nhân và gợi ý
-          dùng con số nào cho mục đích nào. Trang này chỉ để đọc; quyết định về từng claim nằm ở bước Kho bằng chứng.
+          dùng con số nào cho mục đích nào. Cặp nào giải thích được bằng ngày và hạng nguồn (bản cập nhật, số liệu cũ, kỳ
+          trước, nguồn yếu hơn) thì <strong>code xếp loại</strong>; chỉ cặp giữa hai nguồn A/B cùng kỳ mới nhờ{" "}
+          <strong>AI gán nguyên nhân</strong>. Trang này chỉ để đọc; quyết định về từng claim nằm ở bước Kho bằng chứng.
         </p>
       </div>
 

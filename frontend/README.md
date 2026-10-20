@@ -43,8 +43,13 @@ No keys or secrets belong in `frontend/`; the browser only knows the backend URL
 ### Local mock backend (UI tests only)
 
 `tests/mock_api.py` starts the REAL FastAPI routes (`backend/api/main.py`) with an in-memory store instead of PostgreSQL runs,
-fixture runs from the saved results under `backend/runs/p4/round_1`, and timed simulations instead of the model-backed jobs, so
-no model quota is spent. Chunk passages still come from the real database (read-only).
+fixture runs from saved results, and timed simulations instead of the model-backed jobs, so no model quota is spent. Chunk
+passages still come from the real database (read-only). Fixtures: `mockq1` (Mission 2 run, `backend/runs/p4/round_1/Q1`),
+`m3q1`..`m3q5`, `m3a`, `m3b` (Mission 3 code on saved M2 outputs, `backend/runs/m3/layer_a`), and `r1-<key>` for every finished
+item under `backend/runs/m3/round_1` present when the mock starts (live M3 outputs; follow-ups such as T15 are linked to their
+parent, with inherited decisions). The follow-up endpoint is the real one; the simulated follow-up run copies its parent's
+results and rebuilds the memo with the real memo code from the saved sentences. A follow-up question containing `KHAC` is
+treated as unrelated to its parent.
 
 ```
 .venv\Scripts\python frontend\tests\mock_api.py                # from the repo root, listens on :8001

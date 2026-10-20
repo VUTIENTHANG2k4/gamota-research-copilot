@@ -130,3 +130,22 @@ def test_draft_regulation_is_not_main_evidence():
 def test_internal_data_gap_points_to_internal_data():
     v = trust.evaluate([], [], "market", "Retention D7 thực tế của game X quý gần nhất")
     assert v["refused"] and "nội bộ" in v["next_steps"][0]
+
+
+def test_live_x1_bug_publication_date_in_scope_does_not_make_a_newer_period():
+    """Found in the live M3 run (X1, 2026-10-21): SYN14's scope says 'bài đăng ngày 20/9/2026', the M2 year
+    parser read 2026, and the grade A 2025 figure from SYN13 was moved to history as an older period."""
+    a = claim("SYN13", FARM.format(12), answers="direct")
+    b = claim("SYN14", FARM.format(30), answers="partial")
+    b["scope"] = "Ước tính của một thành viên diễn đàn Giả Lập Q (bài đăng ngày 20/9/2026), năm 2025"
+    assert trust.period_year(b) == 2025
+    v = trust.evaluate([a, b], [], "market", "Tổng lượt tải game nông trại năm 2025?")
+    assert v["main"] == [a["claim_id"]] and v["level"] == "Medium" and not v["history"]
+    assert any(u["code"] == "weak_dissent" for u in v["uncertain"])
+
+
+def test_weaker_source_about_a_later_period_does_not_push_a_strong_one_into_history():
+    a = claim("SYN13", FARM.format(12), answers="direct")
+    b = claim("SYN14", "Năm 2026 game nông trại trên mobile tại Việt Nam có khoảng 30 triệu lượt tải", answers="direct")
+    v = trust.evaluate([a, b], [], "market", "x")
+    assert a["claim_id"] in v["main"] and not v["history"]

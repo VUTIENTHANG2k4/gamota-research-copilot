@@ -1,4 +1,15 @@
-import { ApiHttpError, ApiUnreachableError, type Claim, type Grade, type Level, type MemoStatus, type Run, type RunStatus } from "./api";
+import {
+  ApiHttpError,
+  ApiUnreachableError,
+  type Answers,
+  type Claim,
+  type Grade,
+  type Level,
+  type MemoStatus,
+  type Run,
+  type RunStatus,
+  type Tier,
+} from "./api";
 
 export const LEVEL_ORDER: Level[] = ["Chưa đủ căn cứ", "Low", "Medium", "High"];
 
@@ -20,9 +31,67 @@ export const CAUSE_VI: Record<string, string> = {
   method: "Khác phương pháp",
   legal_status: "Khác tình trạng pháp lý",
   unknown: "Chưa rõ nguyên nhân",
+  // Mission 3 relations decided by code
+  revision: "Bản cập nhật thay bản trước",
+  stale: "Số liệu cũ",
+  weak_dissent: "Nguồn yếu hơn cho số khác",
 };
 
 export const causeVi = (c: string) => CAUSE_VI[c] ?? c;
+
+/** Mission 3 trust tiers. */
+export const TIER_VI: Record<Tier, string> = {
+  supported: "Có thể tin",
+  uncertain: "Chưa chắc chắn",
+  refused: "Chưa có căn cứ",
+};
+export const TIER_ORDER: Tier[] = ["supported", "uncertain", "refused"];
+
+/** Same fallback as the backend (memo.py): tier from the level when an older run has no tier. */
+export function tierOf(v: { tier?: Tier; level: Level }): Tier {
+  if (v.tier) return v.tier;
+  return v.level === "High" ? "supported" : v.level === "Chưa đủ căn cứ" ? "refused" : "uncertain";
+}
+
+/** Short plain-Vietnamese name of each "uncertain" code; the API's `text` is always shown next to it. */
+export const UNCERTAIN_VI: Record<string, string> = {
+  single_origin: "Chỉ có 1 nguồn gốc độc lập",
+  explained_conflict: "Nguồn mâu thuẫn, đã rõ nguyên nhân",
+  unexplained_conflict: "Nguồn mâu thuẫn, chưa rõ nguyên nhân",
+  weak_dissent: "Nguồn yếu hơn cho số khác",
+  draft: "Dự thảo",
+  partial_relevance: "Chỉ trả lời một phần",
+};
+export const uncertainVi = (c: string) => UNCERTAIN_VI[c] ?? c;
+
+/** History codes: old figures kept only as history, never conclusions. */
+export const HISTORY_VI: Record<string, string> = {
+  stale: "Số liệu cũ",
+  superseded: "Đã có bản cập nhật",
+  older_period: "Số kỳ trước",
+};
+export const historyVi = (c: string) => HISTORY_VI[c] ?? c;
+
+export const ANSWERS_VI: Record<Answers, string> = {
+  direct: "trả lời trực tiếp",
+  partial: "trả lời một phần",
+  context: "chỉ là bối cảnh",
+};
+
+/** "kế thừa từ <id>" in reviewed_by: the decision was copied from the parent run. Returns the parent id. */
+export function inheritedFrom(reviewedBy: string | null | undefined): string | null {
+  const m = reviewedBy?.match(/^kế thừa từ\s+(\S+)/);
+  return m ? m[1] : null;
+}
+
+/** Core sub-question IDs. An empty list means every sub-question counts as core (backend rule, trust.overall). */
+export function coreIds(run: Run): { ids: Set<string>; marked: boolean } {
+  const fromMemo = run.memo?.core ?? [];
+  const fromBrief = (run.brief?.sub_questions ?? []).filter((q) => q.core).map((q) => q.id);
+  const list = fromMemo.length ? fromMemo : fromBrief;
+  if (list.length) return { ids: new Set(list), marked: true };
+  return { ids: new Set(run.subs.map((s) => s.id)), marked: false };
+}
 
 export const GRADE_TONE: Record<Grade, "ok" | "warn" | "danger"> = {
   A: "ok",

@@ -25,12 +25,19 @@ export interface RunSummary {
   has_result: boolean;
 }
 
+/** Mission 3 trust tier of a sub-question (computed by code). */
+export type Tier = "supported" | "uncertain" | "refused";
+/** How directly a claim answers its sub-question (Mission 3; missing on older runs). */
+export type Answers = "direct" | "partial" | "context";
+
 export interface SubQuestion {
   id: string;
   text: string;
   search_query?: string;
   search_query_en?: string;
   evidence_type?: string;
+  /** true = directly answers the original question ("câu hỏi con chính"). Missing on older runs. */
+  core?: boolean;
 }
 
 export interface Brief {
@@ -81,7 +88,10 @@ export interface Claim {
   src_data_date: string;
   src_publish_date: string;
   review: ReviewState;
+  /** Username, or "kế thừa từ <run id>" when the decision was inherited from the parent run. */
   reviewed_by?: string | null;
+  answers?: Answers | null;
+  answers_reason?: string | null;
   source: SourceMeta;
 }
 
@@ -104,6 +114,30 @@ export interface Conflict {
   status: "explained" | "unexplained";
   relative_diff?: number;
   synthetic_involved?: boolean;
+  /** Mission 3: who decided the relation. "code" = from dates and grades, "llm" = cause labelled by the model. */
+  decided_by?: "code" | "llm";
+}
+
+export type UncertainCode =
+  | "single_origin"
+  | "explained_conflict"
+  | "unexplained_conflict"
+  | "weak_dissent"
+  | "draft"
+  | "partial_relevance";
+export type HistoryCode = "stale" | "superseded" | "older_period";
+
+export interface UncertainItem {
+  code: UncertainCode | string;
+  text: string;
+  claim_ids: string[];
+}
+
+export interface HistoryItem {
+  code: HistoryCode | string;
+  claim_id: string;
+  text: string;
+  data_date: string;
 }
 
 export interface Verdict {
@@ -111,12 +145,26 @@ export interface Verdict {
   reason: string;
   refused?: boolean;
   independent_ab?: number;
+  // Mission 3 (computed by code; missing on older runs)
+  tier?: Tier;
+  main?: string[];
+  uncertain?: UncertainItem[];
+  history?: HistoryItem[];
+  next_steps?: string[];
+  codes?: string[];
+}
+
+export interface Retrieved {
+  chunk_id: string;
+  source_id: string;
+  page: number;
+  score: number;
 }
 
 export interface Sub {
   id: string;
   text: string;
-  retrieved: { chunk_id: string; source_id: string; page: number; score: number }[];
+  retrieved: Retrieved[];
   claims: Claim[];
   rejected_claims: RejectedClaim[];
   conflicts: Conflict[];
@@ -132,6 +180,12 @@ export interface MemoPoint {
   draft_flag: boolean;
 }
 
+export interface MemoClaimRef {
+  claim_id: string;
+  content: string;
+  citation: string;
+}
+
 export interface MemoSub {
   id: string;
   text: string;
@@ -139,17 +193,52 @@ export interface MemoSub {
   refused_text: string | null;
   points: MemoPoint[];
   conflicts: Conflict[];
-  reference_signals_cd: { claim_id: string; content: string; citation: string }[];
+  reference_signals_cd: MemoClaimRef[];
+  // Mission 3 (missing on older memos)
+  tier?: Tier;
+  main_evidence?: MemoClaimRef[];
+  uncertain?: (UncertainItem & { claims?: MemoClaimRef[] })[];
+  history?: (HistoryItem & { content: string; citation: string })[];
+  next_steps?: string[];
+}
+
+export interface MemoFollowup {
+  parent_id: string;
+  parent_question: string;
+  /** false = the model judged the new question unrelated to the parent: nothing was inherited. */
+  related: boolean;
+  /** false = the user dropped the inherited context before asking. */
+  inherit: boolean;
+  /** Number of review decisions copied from the parent. */
+  inherited: number;
 }
 
 export interface Memo {
   question: string;
-  overall: { level: Level; reason: string };
+  overall: { level: Level; reason: string; refused?: boolean };
   subs: MemoSub[];
   gaps: string[];
   key_assumptions: string[];
+  /** Mission 3: "where to look next", each prefixed by the sub-question ID. */
   next_steps: string[];
   stats?: { llm_fact?: number; llm_fact_supported?: number; demoted?: number };
+  // Mission 3 (missing on older memos)
+  tiers?: Record<Tier, string[]>;
+  core?: string[];
+  followup?: MemoFollowup | null;
+}
+
+/** What a follow-up run inherited from its parent ("bối cảnh kế thừa"). */
+export interface RunContext {
+  parent_id: string;
+  parent_question: string;
+  inherit: boolean;
+  decision?: string;
+  scope?: string;
+  gaps?: string[];
+  rejected_claims?: string[];
+  confirmed_claims?: string[];
+  rejected_sources?: string[];
 }
 
 export interface Run {
@@ -157,6 +246,8 @@ export interface Run {
   question: string;
   parent_id: string | null;
   created_by: string | null;
+  /** Mission 3: set only on a follow-up run. */
+  context?: RunContext | null;
   created_at: string;
   finished_at: string | null;
   status: RunStatus;
@@ -272,6 +363,10 @@ export const api = {
   startRun: (question: string) => sendJson<{ id: string }>("POST", "/api/runs", { question }),
   deleteRun: (id: string) => sendJson<{ deleted: string }>("DELETE", `/api/runs/${enc(id)}`),
   clarify: (id: string, answer: string) => sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/clarify`, { answer }),
+  /** Mission 3: continue the research from a finished run. `inherit=false` drops the inherited context. */
+  followup: (id: string, question: string, inherit: boolean) =>
+    sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/followup`, { question, inherit }),
+  sources: () => request<SourceMeta[]>("/api/sources"),
   review: (id: string, claimId: string, state: ReviewState) =>
     sendJson<Run>("PUT", `/api/runs/${enc(id)}/claims/${enc(claimId)}/review`, { state }),
   rewriteMemo: (id: string) => sendJson<{ id: string }>("POST", `/api/runs/${enc(id)}/memo`),

@@ -12,7 +12,7 @@ from itertools import combinations
 from pathlib import Path
 
 from app import dedupe
-from app.conflict import THRESHOLD, _year, comparable_value, similar
+from app.conflict import THRESHOLD, comparable_value, similar
 from app.grade import parse_data_date
 
 NEI = "Chưa đủ căn cứ"
@@ -65,6 +65,20 @@ def _strong(c: dict) -> bool:
     return c["grade"] in ("A", "B")
 
 
+YEAR_IN_TEXT = re.compile(r"(?:năm|year|in|FY)\s*(20\d\d)\b", re.I)
+
+
+def period_year(c: dict) -> int | None:
+    """Year the figure is about. From the claim text ("năm 2025"), then the claim's data_date, then the source's
+    data date. NOT from the free-text scope: it mixes in publication dates ("bài đăng ngày 20/9/2026"), which made
+    a 2025 figure look like 2026 data in the live X1 run (M2's conflict._year reads the scope)."""
+    years = [int(y) for y in YEAR_IN_TEXT.findall(c.get("content") or "")]
+    if len(set(years)) == 1:
+        return years[0]
+    d = parse_data_date(c.get("data_date") or "") or parse_data_date(c.get("src_data_date") or "")
+    return d.year if d else None
+
+
 def relations(claims: list[dict], labelled: list[dict]) -> list[dict]:
     """Every pair of comparable claims whose figures differ by more than 10%, with the relation decided by code:
     revision, older_period, stale, weak_dissent, weak_pair, or a labelled conflict (needs_label=True when the
@@ -79,7 +93,7 @@ def relations(claims: list[dict], labelled: list[dict]) -> list[dict]:
         if diff <= THRESHOLD or similar(a, b) < 0.25:
             continue
         rel = {"claim_a": a["claim_id"], "claim_b": b["claim_id"], "relative_diff": round(diff, 3)}
-        ya, yb = _year(a), _year(b)
+        ya, yb = period_year(a), period_year(b)
         same_origin = dedupe.origin_of(a["source_id"]) == dedupe.origin_of(b["source_id"])
         if same_origin and a["source_id"] != b["source_id"] and (ya is None or yb is None or ya == yb):
             pa, pb = _pub(a), _pub(b)
@@ -94,9 +108,12 @@ def relations(claims: list[dict], labelled: list[dict]) -> list[dict]:
             out.append({**rel, "relation": "stale", "older": stale["claim_id"]})
             continue
         if ya and yb and ya != yb:
-            old = a if ya < yb else b
-            out.append({**rel, "relation": "older_period", "older": old["claim_id"], "years": sorted([ya, yb])})
-            continue
+            old, new = (a, b) if ya < yb else (b, a)
+            # a weaker source about a later period never pushes a stronger one into history (found in the live
+            # X1 run, 2026-10-21): that case is a weak dissent, handled below
+            if _strong(new) or not _strong(old):
+                out.append({**rel, "relation": "older_period", "older": old["claim_id"], "years": sorted([ya, yb])})
+                continue
         if _strong(a) != _strong(b):
             weak = b if _strong(a) else a
             out.append({**rel, "relation": "weak_dissent", "weak": weak["claim_id"]})
