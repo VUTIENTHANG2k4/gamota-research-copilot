@@ -6,7 +6,7 @@ from psycopg.types.json import Jsonb
 
 from app import db
 
-JSON_COLS = ("brief", "p2", "p3", "memo")
+JSON_COLS = ("brief", "p2", "p3", "memo", "context")
 
 
 def _conn():
@@ -24,11 +24,13 @@ def init() -> None:
         conn.commit()
 
 
-def create_run(question: str, parent_id: str | None = None, created_by: str | None = None) -> str:
+def create_run(question: str, parent_id: str | None = None, created_by: str | None = None,
+               context: dict | None = None) -> str:
     run_id = uuid.uuid4().hex[:10]
     with _conn() as conn:
-        conn.execute("INSERT INTO runs (id, question, parent_id, created_by, status, stage) "
-                     "VALUES (%s,%s,%s,%s,'queued','chờ xử lý')", (run_id, question, parent_id, created_by))
+        conn.execute("INSERT INTO runs (id, question, parent_id, created_by, status, stage, context) "
+                     "VALUES (%s,%s,%s,%s,'queued','chờ xử lý',%s)",
+                     (run_id, question, parent_id, created_by, Jsonb(context) if context else None))
         conn.commit()
     return run_id
 

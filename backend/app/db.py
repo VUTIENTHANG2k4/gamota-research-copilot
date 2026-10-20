@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS created_by text;
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS reviewed_by text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS context jsonb;
 """
 
 

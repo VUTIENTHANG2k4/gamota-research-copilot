@@ -82,10 +82,12 @@ def ingest() -> dict:
 
 def ensure_ingested() -> int:
     """Load the corpus into an empty database (first deploy). Returns the number of chunks."""
+    expected = sum(1 for _ in csv.DictReader(open(CORPUS / "sources.csv", encoding="utf-8")))
     with db.connect() as conn:
         db.init_schema(conn)
         n = conn.execute("SELECT count(*) FROM chunks").fetchone()[0]
-    if n == 0:
+        n_src = conn.execute("SELECT count(*) FROM sources").fetchone()[0]
+    if n == 0 or n_src != expected:  # empty, or the fixed corpus changed (Mission 3 added documents)
         n = ingest()["chunks"]
         from app import pipeline
         pipeline.reset_index()

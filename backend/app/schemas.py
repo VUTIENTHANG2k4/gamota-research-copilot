@@ -9,6 +9,7 @@ class SubQuestion(BaseModel):
     search_query: str
     search_query_en: str  # English keywords: part of the corpus is English
     evidence_type: str
+    core: bool  # Mission 3: true when this sub-question directly answers the original question
 
 
 class Brief(BaseModel):
@@ -28,6 +29,10 @@ class Brief(BaseModel):
         return self
 
 
+class FollowupBrief(Brief):
+    related_to_parent: bool  # Mission 3: false when the follow-up has nothing to do with the parent research
+
+
 class DraftClaim(BaseModel):
     content: str
     value: float | None = None
@@ -36,6 +41,8 @@ class DraftClaim(BaseModel):
     data_date: str | None = None
     claim_type: Literal["fact", "estimate", "opinion"]
     passage: str  # verbatim quote from the chunk
+    answers: Literal["direct", "partial", "context"]  # Mission 3: how directly the claim answers the sub-question
+    answers_reason: str
 
 
 class ExtractOut(BaseModel):

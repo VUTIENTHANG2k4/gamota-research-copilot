@@ -101,7 +101,7 @@ export function CorpusNotReady({ corpus, onRetry }: { corpus: Health["corpus"]; 
         </>
       ) : (
         <p className="mt-1 text-[14px]">
-          Máy chủ vừa khởi động và đang nạp 30 tài liệu vào cơ sở dữ liệu ({corpus.state === "ingesting" ? "đang nạp" : "đang khởi động"}).
+          Máy chủ vừa khởi động và đang nạp 36 tài liệu vào cơ sở dữ liệu ({corpus.state === "ingesting" ? "đang nạp" : "đang khởi động"}).
           Chưa thể bắt đầu câu hỏi mới, và đoạn gốc của claim có thể chưa mở được. Hãy thử lại sau ít phút.
         </p>
       )}

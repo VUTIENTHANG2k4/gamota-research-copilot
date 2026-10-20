@@ -7,7 +7,7 @@ from docx.shared import Pt
 LEVEL_VI = {"High": "Cao", "Medium": "Trung bình", "Low": "Thấp", "Chưa đủ căn cứ": "Chưa đủ căn cứ"}
 LIMITATIONS = [
     "Đây là MVP/prototype do AI biên soạn, không phải sản phẩm hoàn chỉnh; hãy mở đoạn gốc của từng claim trước khi dùng.",
-    "Kho nguồn cố định gồm 30 tài liệu, trong đó 12 tài liệu SYNTHETIC tự soạn; chúng không bao giờ được dùng để kết luận về thị trường thật.",
+    "Kho nguồn cố định gồm 36 tài liệu, trong đó 18 tài liệu SYNTHETIC tự soạn; chúng không bao giờ được dùng để kết luận về thị trường thật.",
     "Tìm kiếm chỉ dùng từ khóa nên có thể bỏ sót nguồn có trong kho; mức chắc chắn chưa kiểm tra claim có trả lời đúng câu hỏi con hay không.",
     "Phạm vi, năm và chủ thể trong claim do mô hình điền và chưa được kiểm tự động; số trong bảng/biểu đồ PDF có thể bị đọc sai.",
 ]

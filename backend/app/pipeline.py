@@ -7,10 +7,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from app import dedupe
+from app import dedupe, trust
 from app.brief import make_brief
-from app.confidence import confidence
-from app.conflict import classify, find_candidates
+from app.conflict import classify
 from app.extract import extract_claims
 from app.grade import data_kind, grade_source
 from app.retrieve import Index
@@ -43,12 +42,16 @@ def _pmap(fn, items: list) -> list:
         return list(pool.map(fn, items))
 
 
-def retrieve_extract(question: str, tag: str) -> dict:
-    """Steps 1-4 (P2). Stops early when the brief asks for clarification."""
+def retrieve_extract(question: str, tag: str, context: dict | None = None) -> dict:
+    """Steps 1-4 (P2). Stops early when the brief asks for clarification.
+    context (Mission 3 follow-up): the parent research's question, decision, scope and gaps."""
     t0 = time.time()
-    brief, b_retries = make_brief(question, tag=f"{tag}_brief")
+    brief, b_retries = make_brief(question, tag=f"{tag}_brief", context=context)
     out = {"question": question, "brief": brief.model_dump(), "brief_retries": b_retries, "subs": [],
            "timing": {"brief_s": round(time.time() - t0, 1)}}
+    if context:
+        out["followup"] = {"parent_id": context.get("parent_id"),
+                           "related": bool(getattr(brief, "related_to_parent", False))}
     if brief.needs_clarification:
         return out
     t1 = time.time()
@@ -78,10 +81,28 @@ def retrieve_extract(question: str, tag: str) -> dict:
     return out
 
 
+CODE_CAUSE = {"revision": ("revision", "Cùng nguồn gốc, bản phát hành sau thay thế bản trước."),
+              "older_period": ("year", "Hai số liệu thuộc hai kỳ khác nhau; số của kỳ mới hơn là căn cứ chính."),
+              "stale": ("stale", "Một số liệu đã quá cũ so với cửa sổ thời gian; chỉ giữ làm lịch sử."),
+              "weak_dissent": ("weak_dissent", "Nguồn hạng C/D cho số khác nguồn hạng A/B; không làm thay đổi kết luận."),
+              "weak_pair": ("unknown", "Hai nguồn hạng C/D cho số khác nhau; không nguồn nào đủ căn cứ.")}
+
+
+def code_conflict(r: dict) -> dict:
+    """A relation decided by code (no model call), in the same shape as an LLM-labelled conflict."""
+    cause, why = CODE_CAUSE[r["relation"]]
+    return {"claim_a": r["claim_a"], "claim_b": r["claim_b"], "cause": cause, "decided_by": "code",
+            "status": "unexplained" if r["relation"] == "weak_pair" else "explained", "explanation": why,
+            "usage_suggestion": "", "relative_diff": r["relative_diff"]}
+
+
 def grade_and_decide(p2: dict, tag: str) -> dict:
-    """Steps 5 (P3): grades, origins, conflicts, confidence. Verdict computed real-only and with SYNTHETIC."""
+    """Step 5: grades, origins, conflicts, trust tiers. Verdict computed real-only and with SYNTHETIC.
+    Mission 3: relations between claims (revision, older period, stale, weak dissent) are decided by code;
+    the model only labels the cause for two in-window A/B claims of the same period (trust.relations)."""
     t0 = time.time()
-    result = {"question": p2["question"], "subs": []}
+    core = [q["id"] for q in (p2.get("brief") or {}).get("sub_questions", []) if q.get("core")]
+    result = {"question": p2["question"], "subs": [], "core": core}
     prepared, jobs = [], []
     for s in p2["subs"]:
         kind = data_kind(s["text"])
@@ -100,32 +121,40 @@ def grade_and_decide(p2: dict, tag: str) -> dict:
                            "origin_group": dedupe.origin_of(c["source_id"]),
                            "source_type": src["source_type"], "has_methodology": src["has_methodology"],
                            "src_data_date": src["data_date"], "src_publish_date": src["publish_date"]})
-        pairs = find_candidates(claims)
-        prepared.append((s, kind, claims, pairs))
-        jobs += [(s["id"], n, a, b) for n, (a, b, _) in enumerate(pairs) if n < MAX_PAIRS]
+        rels = trust.relations(claims, [])
+        need = [r for r in rels if r.get("needs_label")]
+        prepared.append((s, kind, claims, rels))
+        by_id = {c["claim_id"]: c for c in claims}
+        jobs += [(s["id"], n, by_id[r["claim_a"]], by_id[r["claim_b"]], r["relative_diff"])
+                 for n, r in enumerate(need) if n < MAX_PAIRS]
 
-    # cause labels (model calls) for the pairs of all sub-questions, in parallel; tags are unchanged
-    labels = dict(zip([(j[0], j[1]) for j in jobs],
-                      _pmap(lambda j: classify(j[2], j[3], f"{tag}_{j[0]}_conf{j[1]}"), jobs)))
-    for s, kind, claims, pairs in prepared:
-        conflicts = []
-        for n, (a, b, diff) in enumerate(pairs):
-            syn = bool(a["is_synthetic"] or b["is_synthetic"])
-            if n < MAX_PAIRS:
-                conflicts.append({**labels[(s["id"], n)], "relative_diff": round(diff, 3), "synthetic_involved": syn})
-            else:
-                conflicts.append({"claim_a": a["claim_id"], "claim_b": b["claim_id"], "cause": "unknown",
-                                  "status": "unexplained", "relative_diff": round(diff, 3),
-                                  "explanation": "Chưa gán nhãn nguyên nhân (vượt giới hạn số cặp).",
-                                  "usage_suggestion": "", "synthetic_involved": syn})
+    # cause labels (model calls) only where code cannot decide, in parallel
+    labels = _pmap(lambda j: {**classify(j[2], j[3], f"{tag}_{j[0]}_conf{j[1]}"), "relative_diff": round(j[4], 3),
+                              "decided_by": "llm"}, jobs)
+    labelled = {}
+    for j, lab in zip(jobs, labels):
+        labelled.setdefault(j[0], []).append(lab)
+    for s, kind, claims, rels in prepared:
+        conflicts = list(labelled.get(s["id"], []))
+        done = {frozenset((x["claim_a"], x["claim_b"])) for x in conflicts}
+        for r in rels:
+            if r["relation"] == "conflict" and frozenset((r["claim_a"], r["claim_b"])) not in done:
+                conflicts.append({"claim_a": r["claim_a"], "claim_b": r["claim_b"], "cause": "unknown",
+                                  "status": "unexplained", "decided_by": "code", "relative_diff": r["relative_diff"],
+                                  "explanation": "Chưa gán nhãn nguyên nhân (vượt giới hạn số cặp).", "usage_suggestion": ""})
+            elif r["relation"] != "conflict":
+                conflicts.append(code_conflict(r))
+        by_id = {c["claim_id"]: c for c in claims}
+        for x in conflicts:
+            x["synthetic_involved"] = bool(by_id[x["claim_a"]]["is_synthetic"] or by_id[x["claim_b"]]["is_synthetic"])
         real = [c for c in claims if not c["is_synthetic"]]
         real_ids = {c["claim_id"] for c in real}
         real_conf = [x for x in conflicts if x["claim_a"] in real_ids and x["claim_b"] in real_ids]
         result["subs"].append({
             "id": s["id"], "text": s["text"], "data_kind": kind, "claims": claims, "conflicts": conflicts,
-            "pairs_found": len(pairs),
-            "verdict_real_only": confidence(real, real_conf),
-            "verdict_with_synthetic": confidence(claims, conflicts)})
+            "pairs_found": len(rels),
+            "verdict_real_only": trust.evaluate(real, real_conf, kind, s["text"]),
+            "verdict_with_synthetic": trust.evaluate(claims, conflicts, kind, s["text"])})
     result["timing"] = {"grade_conflict_s": round(time.time() - t0, 1)}
     return result
 

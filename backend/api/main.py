@@ -70,7 +70,7 @@ def need_run(run_id: str) -> dict:
 
 
 def view(run: dict) -> dict:
-    out = {k: run[k] for k in ("id", "question", "parent_id", "created_by", "status", "stage", "error", "created_at", "finished_at",
+    out = {k: run.get(k) for k in ("id", "question", "parent_id", "created_by", "context", "status", "stage", "error", "created_at", "finished_at",
                                 "brief", "memo", "memo_status", "memo_error", "memo_generated_at")}
     out["subs"], out["review_summary"] = [], {"confirmed": 0, "rejected": 0}
     if run["p3"]:
@@ -94,6 +94,11 @@ class QuestionIn(BaseModel):
 
 class ClarifyIn(BaseModel):
     answer: str = Field(min_length=2, max_length=600)
+
+
+class FollowupIn(BaseModel):
+    question: str = Field(min_length=3, max_length=400)
+    inherit: bool = True  # the UI lets the user drop the inherited context
 
 
 class ReviewIn(BaseModel):
@@ -185,6 +190,24 @@ def clarify(run_id: str, req: ClarifyIn, user: str | None = User):
     except service.Busy as e:
         raise HTTPException(429, str(e))
     new_id = store.create_run(f"{run['question']} (Làm rõ: {req.answer.strip()})"[:900], parent_id=run_id, created_by=user)
+    service.start(service.run_job, new_id)
+    return {"id": new_id}
+
+
+@app.post("/api/runs/{run_id}/followup", status_code=202)
+def followup(run_id: str, req: FollowupIn, user: str | None = User):
+    """Mission 3: continue the research from a finished run, keeping its context."""
+    parent = need_run(run_id)
+    if parent["status"] != "done" or not parent["p3"]:
+        raise HTTPException(409, "Chỉ nghiên cứu tiếp được từ một lần chạy đã xong.")
+    if service.depth(run_id) + 1 > service.MAX_DEPTH:
+        raise HTTPException(409, f"Chuỗi nghiên cứu tiếp đã đủ {service.MAX_DEPTH} bước; hãy bắt đầu câu hỏi mới.")
+    try:
+        service.reserve_slot()
+    except service.Busy as e:
+        raise HTTPException(429, str(e))
+    ctx = service.followup_context(parent, req.inherit)
+    new_id = store.create_run(req.question.strip(), parent_id=run_id, created_by=user, context=ctx)
     service.start(service.run_job, new_id)
     return {"id": new_id}
 

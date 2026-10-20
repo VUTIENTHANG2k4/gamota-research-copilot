@@ -9,7 +9,10 @@ SYSTEM = (
     "ghi rõ phạm vi (thị trường, nền tảng, năm, định nghĩa đo lường) trong 'scope'. "
     "Hãy trích MỌI claim liên quan đến chủ đề của câu hỏi con, kể cả khi năm, nguồn hay định nghĩa khác với câu hỏi; "
     "không loại bỏ chỉ vì khác năm hay khác định nghĩa, mà ghi sự khác biệt đó vào scope. "
-    "Chỉ trả claims rỗng khi các đoạn hoàn toàn không liên quan. Viết content bằng tiếng Việt."
+    "Chỉ trả claims rỗng khi các đoạn hoàn toàn không liên quan. Viết content bằng tiếng Việt. "
+    "Với mỗi claim, gán answers: 'direct' nếu claim trả lời trực tiếp câu hỏi con (đúng chủ đề, đúng đại lượng), "
+    "'partial' nếu chỉ trả lời một phần (đúng chủ đề nhưng khác đại lượng, phạm vi hẹp hơn hoặc rộng hơn), "
+    "'context' nếu chỉ là thông tin bối cảnh; answers_reason giải thích ngắn gọn."
 )
 
 

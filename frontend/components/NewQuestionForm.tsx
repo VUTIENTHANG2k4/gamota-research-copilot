@@ -99,7 +99,7 @@ export function NewQuestionForm({
         Đặt một câu hỏi nghiên cứu thị trường game
       </h1>
       <p className="mt-2 text-muted">
-        Hệ thống tìm trong kho 30 tài liệu cố định, trích các khẳng định (claim) kèm đoạn gốc, chấm hạng nguồn A đến D, đối
+        Hệ thống tìm trong kho 36 tài liệu cố định, trích các khẳng định (claim) kèm đoạn gốc, chấm hạng nguồn A đến D, đối
         soát mâu thuẫn rồi soạn memo một trang với mức chắc chắn và lý do. Khi chưa đủ căn cứ, memo ghi rõ &quot;Chưa đủ căn
         cứ&quot; thay vì đoán.
       </p>

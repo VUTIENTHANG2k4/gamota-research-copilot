@@ -1,0 +1,7 @@
+SYNTHETIC - tài liệu tự soạn để kiểm thử, toàn bộ số liệu và tên tổ chức là giả lập, KHÔNG phản ánh thị trường thật hay Gamota thật.
+
+Báo cáo R: Doanh thu game đua xe trên mobile tại Việt Nam năm 2022
+
+Đơn vị thực hiện: Công ty Tư vấn Giả Lập R. Phát hành tháng 2/2023.
+Phương pháp: tổng hợp doanh thu trong ứng dụng của 30 game đua xe trên App Store và Google Play, dữ liệu năm 2022.
+Kết quả: doanh thu game đua xe trên mobile tại Việt Nam năm 2022 đạt 15 triệu USD.

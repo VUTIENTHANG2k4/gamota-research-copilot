@@ -42,7 +42,8 @@ def wait(client, run_id, until, timeout=120):
 def test_health_and_about(client):
     assert client.get("/api/health").json()["mode"] == "MVP / prototype"
     a = client.get("/api/about").json()
-    assert a["corpus"]["documents"] == 30 and a["corpus"]["synthetic"] == 12
+    # Mission 3 added SYN13-SYN18 (pre-registered in docs/spec/09-mission3.md section 4): 30 -> 36 documents
+    assert a["corpus"]["documents"] == 36 and a["corpus"]["synthetic"] == 18 and a["corpus"]["real"] == 18
 
 
 def test_question_validation(client):
@@ -125,3 +126,71 @@ def test_error_text_has_no_local_paths():
     e = RuntimeError("OpenRouter HTTP 429: limit (see D:\gamota\runs\20261013_x.json)")
     msg = service.clean_error(e)
     assert "D:\\" not in msg and "RuntimeError: OpenRouter HTTP 429: limit" in msg
+
+
+def _done_run(client, q="Quy định về thời gian chơi game của trẻ em là gì?"):
+    rid = client.post("/api/runs", json={"question": q}).json()["id"]
+    run = wait(client, rid, lambda r: r["status"] in ("done", "error", "needs_clarification"))
+    assert run["status"] == "done", run.get("error")
+    return rid, run
+
+
+def test_followup_keeps_context_and_inherits_rejected_source(client):
+    """Mission 3 (T14 mechanics with a fake LLM): a source rejected entirely in the parent is not used again."""
+    pid, parent = _done_run(client)
+    claims = [c for s in parent["subs"] for c in s["claims"]]
+    src = claims[0]["source_id"]
+    for c in claims:
+        if c["source_id"] == src:
+            client.put(f"/api/runs/{pid}/claims/{c['claim_id']}/review", json={"state": "rejected"})
+    cid = client.post(f"/api/runs/{pid}/followup", json={"question": "Riêng trẻ dưới 16 tuổi thì sao?"}).json()["id"]
+    child = wait(client, cid, lambda r: r["status"] in ("done", "error", "needs_clarification"))
+    assert child["status"] == "done", child.get("error")
+    assert child["parent_id"] == pid and child["context"]["inherit"] and src in child["context"]["rejected_sources"]
+    assert child["memo"]["followup"]["related"] is True
+    from_src = [c for s in child["subs"] for c in s["claims"] if c["source_id"] == src]
+    assert from_src and all(c["review"] == "rejected" and "kế thừa" in c["reviewed_by"] for c in from_src)
+    cited = {i for s in child["memo"]["subs"] for p in s["points"] for i in p["claim_ids"]}
+    assert not cited & {c["claim_id"] for c in from_src}
+    for i in (cid, pid):
+        client.delete(f"/api/runs/{i}")
+
+
+def test_unrelated_followup_inherits_nothing(client):
+    """Mission 3 (T15 mechanics): an unrelated follow-up does not carry the parent's context or decisions."""
+    pid, parent = _done_run(client)
+    c0 = [c for s in parent["subs"] for c in s["claims"]][0]
+    client.put(f"/api/runs/{pid}/claims/{c0['claim_id']}/review", json={"state": "rejected"})
+    cid = client.post(f"/api/runs/{pid}/followup",
+                      json={"question": "Giá cà phê Robusta Tây Nguyên tháng 9/2026 thế nào?"}).json()["id"]
+    child = wait(client, cid, lambda r: r["status"] in ("done", "error", "needs_clarification"))
+    assert child["status"] == "done", child.get("error")
+    assert child["memo"]["followup"]["related"] is False and child["memo"]["followup"]["inherited"] == 0
+    assert child["review_summary"] == {"confirmed": 0, "rejected": 0}
+    for i in (cid, pid):
+        client.delete(f"/api/runs/{i}")
+
+
+def test_followup_without_context_and_depth_limit(client):
+    pid, _ = _done_run(client)
+    ids = [pid]
+    for n in range(3):
+        nid = client.post(f"/api/runs/{ids[-1]}/followup", json={"question": f"Hỏi tiếp lần {n + 1} về trẻ em",
+                                                                  "inherit": n != 0}).json()["id"]
+        r = wait(client, nid, lambda x: x["status"] in ("done", "error", "needs_clarification"))
+        assert r["status"] == "done", r.get("error")
+        if n == 0:
+            assert r["context"]["inherit"] is False and "rejected_claims" not in r["context"]
+            assert r["memo"]["followup"]["inherit"] is False
+        ids.append(nid)
+    resp = client.post(f"/api/runs/{ids[-1]}/followup", json={"question": "Hỏi tiếp lần 4"})
+    assert resp.status_code == 409 and "3 bước" in resp.json()["detail"]
+    for i in reversed(ids):
+        client.delete(f"/api/runs/{i}")
+
+
+def test_followup_only_from_finished_run(client):
+    from api import store
+    rid = store.create_run("Câu hỏi chưa chạy xong")
+    assert client.post(f"/api/runs/{rid}/followup", json={"question": "abc def"}).status_code == 409
+    client.delete(f"/api/runs/{rid}")

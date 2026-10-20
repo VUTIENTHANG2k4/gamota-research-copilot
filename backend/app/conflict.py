@@ -22,6 +22,10 @@ class CauseOut(BaseModel):
 
 MONEY = re.compile(r"(\d[\d.,]*)\s*(tỷ|triệu|billion|million|bn|mn|[BM])?\s*(?:USD|đô la Mỹ|đô la|\$)", re.I)
 PCT = re.compile(r"(\d[\d.,]*)\s*%")
+COUNT_UNITS = {"downloads": r"lượt tải|downloads?|installs?", "users": r"người chơi|người dùng|game thủ|players?|users?"}
+COUNT = re.compile(r"(\d[\d.,]*)\s*(tỷ|triệu|nghìn|billion|million|thousand)?\s*(" +
+                   "|".join(COUNT_UNITS.values()) + ")", re.I)
+SCALE = {"tỷ": 1e9, "billion": 1e9, "triệu": 1e6, "million": 1e6, "nghìn": 1e3, "thousand": 1e3}
 
 
 def _num(t: str) -> float:
@@ -37,7 +41,10 @@ def value_from_text(content: str) -> tuple[float, str] | None:
     if m:
         return _num(m.group(1)), f"{(m.group(2) or '')} USD".strip()
     m = PCT.search(content)
-    return (_num(m.group(1)), "%") if m else None
+    if m:
+        return _num(m.group(1)), "%"
+    m = COUNT.search(content)
+    return (_num(m.group(1)), f"{m.group(2) or ''} {m.group(3)}".strip()) if m else None
 
 
 def comparable_value(claim: dict) -> tuple[str, float] | None:
@@ -53,6 +60,10 @@ def comparable_value(claim: dict) -> tuple[str, float] | None:
     if "usd" in u or "đô" in u or "$" in u:
         scale = 1e9 if ("tỷ" in u or "billion" in u) else 1e6 if ("triệu" in u or "million" in u or u.strip() in ("m usd", "usd m", "musd")) else 1
         return "usd", float(v) * scale
+    for kind, pat in COUNT_UNITS.items():  # Mission 3: counts (downloads, players) are comparable too
+        if re.search(pat, u):
+            scale = next((x for w, x in SCALE.items() if w in u), 1)
+            return kind, float(v) * scale
     return None
 
 

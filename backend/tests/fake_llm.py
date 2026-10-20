@@ -19,13 +19,17 @@ def chat(messages, schema=None, tag="call", max_tokens=1024, timeout=0):
                "clarifying_questions": [],
                "sub_questions": [{"id": f"sq{i}", "text": f"Câu hỏi con {i}: giới hạn thời gian chơi game dưới 18 tuổi",
                                   "search_query": "giới hạn thời gian chơi game 60 phút 180 phút",
-                                  "search_query_en": "game time limit minors", "evidence_type": "legal"} for i in range(1, 4)]}
+                                  "search_query_en": "game time limit minors", "evidence_type": "legal",
+                                  "core": i == 1} for i in range(1, 4)]}
+        if "CÂU HỎI MỚI" in user:  # follow-up brief (Mission 3): unrelated when it is about coffee
+            out["related_to_parent"] = "cà phê" not in user.split("CÂU HỎI MỚI", 1)[1].lower()
     elif "_extract_a" in tag:
         # first chunk in the prompt: "[chunk_id]\n<text>"
         m = re.search(r"\[([^\]]+)\]\n(.+?)(?:\n\n|\Z)", user, re.S)
         text = m.group(2).strip().splitlines()[0][:200] if m else ""
         out = {"claims": [{"content": text, "value": None, "unit": None, "scope": "Việt Nam", "data_date": None,
-                           "claim_type": "fact", "passage": text}] if len(text) > 30 else []}
+                           "claim_type": "fact", "passage": text, "answers": "direct",
+                           "answers_reason": "fake"}] if len(text) > 30 else []}
     elif "_conf" in tag:
         out = {"cause": "unknown", "explanation": "Không đủ căn cứ để giải thích.", "usage_suggestion": "Chưa chọn."}
     elif tag.endswith("_memo_a0") or "_memo_a" in tag:
