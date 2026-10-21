@@ -78,6 +78,8 @@ def build(p3: dict, mode: str, tag: str) -> dict:
         others = [c for c in claims if c["claim_id"] not in {m["claim_id"] for m in main}]
         subs.append({"id": s["id"], "text": s["text"], "verdict": v, "main": main, "others": others,
                      "kind": s.get("data_kind") or "market",
+                     "searched": [r for r in s.get("retrieved", [])
+                                  if mode == "test" or trust.sources().get(r["source_id"], {}).get("is_synthetic") != "true"],
                      "conflicts": conflicts, "by_id": by_id})
         if not v["refused"] and main:
             answered_input.append((s, main))
@@ -151,6 +153,9 @@ def build(p3: dict, mode: str, tag: str) -> dict:
                                    "citation": _cite(s["by_id"][h["claim_id"]])}
                                   for h in s["verdict"].get("history", []) if h["claim_id"] in s["by_id"]],
                       "next_steps": s["verdict"].get("next_steps", []),
+                      # what was searched, so a reader can tell "the corpus has nothing" from "retrieval missed it"
+                      "searched": [{"source_id": r["source_id"], "page": r["page"], "chunk_id": r["chunk_id"]}
+                                   for r in s["searched"]] if s["verdict"]["refused"] else [],
                       "conflicts": s["conflicts"],
                       "reference_signals_cd": [{"claim_id": c["claim_id"], "citation": _cite(c),
                                                 "draft_flag": trust.is_draft(c, s["kind"]),
@@ -200,6 +205,9 @@ def render(m: dict) -> str:
         if s["reference_signals_cd"]:
             out.append("Tín hiệu tham khảo hạng C/D (không dùng làm kết luận):")
             out += [f"  - {c['content']} ({c['citation']})" for c in s["reference_signals_cd"]]
+        if s.get("refused_text"):
+            found = ", ".join(f"{r['source_id']} tr.{r['page']}" for r in s.get("searched", []))
+            out.append("Đã tìm trong: " + (found or "không tìm thấy đoạn tài liệu nào trong kho"))
         if s.get("next_steps"):
             out.append("Nên tìm tiếp: " + " ".join(s["next_steps"]))
         out.append("")

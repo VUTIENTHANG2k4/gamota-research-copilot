@@ -25,11 +25,15 @@ class Index:
                 "FROM chunks c JOIN sources s ON s.id = c.source_id ORDER BY c.id").fetchall()
         self.bm25 = BM25Okapi([tokens(r[3]) for r in self.rows])
 
-    def search(self, query: str, k: int = 5, per_source: int | None = None) -> list[dict]:
-        """Top-k chunks; `per_source` caps chunks per document so one long file cannot crowd out the rest."""
+    def search(self, query: str, k: int = 5, per_source: int | None = None,
+               synthetic: bool | None = None) -> list[dict]:
+        """Top-k chunks; `per_source` caps chunks per document so one long file cannot crowd out the rest.
+        `synthetic` True/False restricts to SYNTHETIC / real documents; None searches both."""
         scores = self.bm25.get_scores(tokens(query))
         order, seen = [], {}
         for i in sorted(range(len(scores)), key=lambda i: -scores[i]):
+            if synthetic is not None and bool(self.rows[i][4]) != synthetic:
+                continue
             sid = self.rows[i][1]
             if per_source and seen.get(sid, 0) >= per_source:
                 continue

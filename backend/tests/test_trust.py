@@ -184,3 +184,31 @@ def test_memo_status_words_check():
     assert not _status_words_ok("Năm 2025 game nông trại dự báo đạt 12 triệu lượt tải.", [achieved])
     assert _status_words_ok("Năm 2025 game nông trại đạt 12 triệu lượt tải.", [achieved])
     assert _status_words_ok("Doanh thu dự kiến đạt 430 triệu USD.", [forecast])
+
+
+# ---- round 3: SYNTHETIC documents no longer take the real documents' retrieval slots ----
+
+def test_search_can_restrict_to_real_or_synthetic_documents():
+    import pytest
+    from app import pipeline
+    try:
+        idx = pipeline.index()
+    except Exception as e:  # no database in this environment
+        pytest.skip(f"database not available: {e}")
+    q = "doanh thu mobile game Việt Nam 2025"
+    real, syn = idx.search(q, 8, per_source=2, synthetic=False), idx.search(q, 4, per_source=2, synthetic=True)
+    assert real and not any(c["is_synthetic"] for c in real)
+    assert syn and all(c["is_synthetic"] for c in syn)
+    assert {c["source_id"] for c in real} & {"S004", "S007", "S008", "S014"}  # real revenue sources reachable
+
+
+def test_memo_lists_what_was_searched_for_refused_subquestions():
+    from app import memo
+    sub = {"id": "sq1", "text": "Doanh thu?", "data_kind": "market", "claims": [], "conflicts": [],
+           "retrieved": [{"chunk_id": "S004-p1-1", "source_id": "S004", "page": 1, "score": 3.2},
+                         {"chunk_id": "SYN05-p1-0", "source_id": "SYN05", "page": 1, "score": 2.0}],
+           "verdict_real_only": trust.evaluate([], [], "market", "Doanh thu?"),
+           "verdict_with_synthetic": trust.evaluate([], [], "market", "Doanh thu?")}
+    m = memo.build({"question": "Doanh thu?", "subs": [sub], "core": ["sq1"]}, "real", "t")
+    assert [r["source_id"] for r in m["subs"][0]["searched"]] == ["S004"]  # SYNTHETIC hidden in real mode
+    assert "Đã tìm trong: S004 tr.1" in m["markdown"]

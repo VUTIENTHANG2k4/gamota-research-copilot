@@ -17,6 +17,7 @@ from app.verify import verify_claim
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PAIRS = 6  # LLM cause labels per sub-question (cost cap)
+REAL_K, SYN_K = 8, 4  # retrieval slots per sub-question: real documents, SYNTHETIC test documents
 CONCURRENCY = max(1, int(os.getenv("LLM_CONCURRENCY", "4")))  # parallel model calls; 1 = sequential
 SRC = {r["id"]: r for r in csv.DictReader(open(ROOT / "corpus/sources.csv", encoding="utf-8"))}
 _idx = None
@@ -57,7 +58,12 @@ def retrieve_extract(question: str, tag: str, context: dict | None = None) -> di
     t1 = time.time()
     jobs = []
     for sq in brief.sub_questions:  # retrieval is local and fast: done in order
-        chunks = index().search(f"{sq.search_query} {sq.search_query_en} {question}", 8, per_source=2)
+        q = f"{sq.search_query} {sq.search_query_en} {question}"
+        # Mission 3 round 3: real documents get their own 8 slots. Before, SYNTHETIC test documents took 51.6% of
+        # the top-8 slots of real questions (evaluator, round 2), and the real-documents memo then had nothing left.
+        # SYNTHETIC documents are searched separately (up to REAL_K/2) for test mode only.
+        chunks = (index().search(q, REAL_K, per_source=2, synthetic=False)
+                  + index().search(q, SYN_K, per_source=2, synthetic=True))
         sub = {"id": sq.id, "text": sq.text, "search_query": sq.search_query, "search_query_en": sq.search_query_en,
                "retrieved": [{k: c[k] for k in ("chunk_id", "source_id", "page", "score")} for c in chunks],
                "claims": [], "extract_retries": None}
@@ -152,7 +158,7 @@ def grade_and_decide(p2: dict, tag: str) -> dict:
         real_conf = [x for x in conflicts if x["claim_a"] in real_ids and x["claim_b"] in real_ids]
         result["subs"].append({
             "id": s["id"], "text": s["text"], "data_kind": kind, "claims": claims, "conflicts": conflicts,
-            "pairs_found": len(rels),
+            "pairs_found": len(rels), "retrieved": s.get("retrieved", []),
             "verdict_real_only": trust.evaluate(real, real_conf, kind, s["text"]),
             "verdict_with_synthetic": trust.evaluate(claims, conflicts, kind, s["text"])})
     result["timing"] = {"grade_conflict_s": round(time.time() - t0, 1)}
