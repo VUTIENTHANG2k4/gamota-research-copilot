@@ -13,8 +13,10 @@ SYSTEM = (
     "ngân sách hay năm) thì BẮT BUỘC needs_clarification=false và có 3-5 câu hỏi con; các điều còn thiếu ghi vào "
     "clarifying_questions (tối đa 3) để người dùng bổ sung sau. "
     "Không đưa tên tổ chức/nhà cung cấp dữ liệu hay năm cụ thể vào câu hỏi con nếu câu hỏi gốc không nêu. "
-    "Với mỗi câu hỏi con, đặt core=true nếu câu hỏi con đó trả lời TRỰC TIẾP câu hỏi gốc (thường 1-2 câu), "
-    "core=false nếu chỉ là thông tin bổ trợ hoặc bối cảnh."
+    "Với mỗi câu hỏi con, đặt core=true CHỈ khi câu hỏi con hỏi đúng đại lượng hoặc điều mà câu hỏi gốc hỏi "
+    "(cùng chủ thể, cùng chỉ số, cùng thời điểm), thường đúng 1 câu, tối đa 2; mọi câu hỏi con về xu hướng, tăng "
+    "trưởng, dự báo, cơ cấu, top game, yếu tố tác động hay so sánh là core=false trừ khi câu hỏi gốc hỏi chính điều đó. "
+    "Ví dụ: câu gốc 'Doanh thu X năm 2025 là bao nhiêu?' thì chỉ câu hỏi con về doanh thu X năm 2025 là core."
 )
 
 FOLLOWUP = (

@@ -125,7 +125,8 @@ def classify(a: dict, b: dict, tag: str) -> dict:
              "definition (định nghĩa đo lường khác), year (năm/kỳ khác), scope (phạm vi khác: thị trường, nền tảng, "
              "nhóm đối tượng), method (phương pháp thu thập khác), legal_status (dự thảo so với đang hiệu lực), "
              "unknown (không đủ căn cứ để giải thích). Chỉ dựa vào thông tin được cung cấp; nếu không chắc, chọn unknown. "
-             "Đưa gợi ý dùng con số nào cho mục đích nào. Viết bằng tiếng Việt."},
+             "Đưa gợi ý dùng con số nào cho mục đích nào. Không nêu tên tổ chức, nguồn dữ liệu hay con số nào không có "
+             "trong hai claim; không đề xuất lấy trung bình. Viết bằng tiếng Việt."},
             {"role": "user", "content": ctx}]
     out, _ = call_model(CauseOut, msgs, tag, max_tokens=3000)
     cause, check = recheck_cause(out.cause.strip().lower(), a, b)

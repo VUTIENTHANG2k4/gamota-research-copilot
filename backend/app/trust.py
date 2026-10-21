@@ -19,8 +19,9 @@ NEI = "Chưa đủ căn cứ"
 LEVEL_ORDER = {NEI: -1, "Low": 0, "Medium": 1, "High": 2}
 TIER = {"High": "supported", "Medium": "uncertain", "Low": "uncertain", NEI: "refused"}
 DRAFT = re.compile(r"dự thảo|đề xuất|lấy ý kiến|draft|proposed", re.I)
-INTERNAL = re.compile(r"retention|\bd[0-9]+\b|arpu|arppu|ltv|dau|mau|nội bộ|của gamota|game x|portfolio|"
-                      r"chỉ số vận hành|cohort|tỷ lệ giữ chân", re.I)
+# Internal data only when the sub-question is about Gamota's own games (ownership), not when it merely names a
+# metric such as D7 or ARPU: market benchmarks for those metrics are public (evaluator, round 1).
+INTERNAL = re.compile(r"gamota|\bgame x\b|game mục tiêu|game này|nội bộ|portfolio|của chúng ta|của công ty", re.I)
 SRC_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sources.csv"
 
 CODE_TEXT = {
@@ -184,6 +185,10 @@ def evaluate(claims: list[dict], labelled_conflicts: list[dict], kind: str, sub_
     for c in claims:
         if not is_fresh(c):
             hist_ids.add(c["claim_id"])
+    # a claim the extractor labelled 'context' (another topic, e.g. racing-game revenue under total market revenue)
+    # is background, never a history figure of this sub-question (evaluator, round 1)
+    out_of_topic = {i for i in hist_ids if by_id[i].get("answers") == "context"}
+    hist_ids -= out_of_topic
     for cid in sorted(hist_ids):
         c = by_id[cid]
         code = ("superseded" if any(r["relation"] == "revision" and r["older"] == cid for r in rels)
@@ -193,7 +198,8 @@ def evaluate(claims: list[dict], labelled_conflicts: list[dict], kind: str, sub_
 
     drafts = [c for c in claims if is_draft(c, kind)]
     answers = {c["claim_id"]: c.get("answers") for c in claims}
-    usable = [c for c in claims if c["claim_id"] not in hist_ids and c not in drafts]
+    usable = [c for c in claims if c["claim_id"] not in hist_ids | out_of_topic and c not in drafts]
+    background += sorted(out_of_topic)
     for c in usable:
         if answers[c["claim_id"]] == "context":
             background.append(c["claim_id"])
@@ -239,7 +245,15 @@ def evaluate(claims: list[dict], labelled_conflicts: list[dict], kind: str, sub_
         elif drafts:
             reason = "Chỉ có nội dung dự thảo / đề xuất, chưa phải quy định đang áp dụng."
         elif claims:
-            reason = f"Chỉ có {len(claims)} claim hạng C/D, không có claim hạng A/B nên không viết kết luận."
+            strong_ctx = [c for c in usable if _strong(c)]
+            weak = [c for c in claims if not _strong(c)]
+            parts = []
+            if strong_ctx:
+                parts.append(f"{len(strong_ctx)} claim hạng A/B chỉ là thông tin bối cảnh")
+            if weak:
+                parts.append(f"{len(weak)} claim hạng C/D")
+            reason = ("Chỉ có " + " và ".join(parts) + "; không có claim hạng A/B trả lời trực tiếp nên không viết kết luận."
+                      if parts else "Không có claim hạng A/B trả lời trực tiếp câu hỏi con.")
         else:
             reason = "Không có claim hợp lệ nào trả lời câu hỏi con."
         return {"level": NEI, "reason": reason, "refused": True, "tier": "refused", **base,

@@ -149,3 +149,38 @@ def test_weaker_source_about_a_later_period_does_not_push_a_strong_one_into_hist
     b = claim("SYN14", "Năm 2026 game nông trại trên mobile tại Việt Nam có khoảng 30 triệu lượt tải", answers="direct")
     v = trust.evaluate([a, b], [], "market", "x")
     assert a["claim_id"] in v["main"] and not v["history"]
+
+
+# ---- iteration 2 (fixes for defects found by the evaluator in live round 1) ----
+
+def test_out_of_topic_stale_claim_is_background_not_history():
+    """Round 1, Q2: racing-game revenue 2022 (SYN17) appeared as 'history' under total market revenue."""
+    race = claim("SYN17", RACE.format(2022, 15), answers="context")
+    main = claim("SYN13", FARM.format(12), answers="direct")
+    v = trust.evaluate([race, main], [], "market", "Tổng lượt tải?")
+    assert race["claim_id"] not in {h["claim_id"] for h in v["history"]}
+    assert race["claim_id"] in v["background"]
+
+
+def test_internal_data_hint_only_for_own_games():
+    own = trust.evaluate([], [], "market", "Retention D7 thực tế của game X trong quý gần nhất")
+    bench = trust.evaluate([], [], "market", "Retention D7 trung bình của thể loại 4X tại Việt Nam")
+    arpu = trust.evaluate([], [], "market", "Xu hướng DAU/MAU và ARPU của game cờ tướng mobile")
+    assert "nội bộ" in own["next_steps"][0]
+    assert "nội bộ" not in bench["next_steps"][0] and "nội bộ" not in arpu["next_steps"][0]
+
+
+def test_refusal_reason_names_strong_context_claims():
+    """Round 1, Q4 sq1: the reason said 'C/D' for a grade B claim that was only context."""
+    b = claim("SYN13", FARM.format(12), answers="context")
+    v = trust.evaluate([b], [], "market", "x")
+    assert v["refused"] and "A/B chỉ là thông tin bối cảnh" in v["reason"] and "C/D" not in v["reason"]
+
+
+def test_memo_status_words_check():
+    from app.memo import _status_words_ok
+    achieved = {"content": "Năm 2025 game nông trại đạt 12 triệu lượt tải", "passage": "đạt 12 triệu lượt tải"}
+    forecast = {"content": "Doanh thu dự kiến đạt 430 triệu USD", "passage": "dự kiến đạt 430 triệu USD"}
+    assert not _status_words_ok("Năm 2025 game nông trại dự báo đạt 12 triệu lượt tải.", [achieved])
+    assert _status_words_ok("Năm 2025 game nông trại đạt 12 triệu lượt tải.", [achieved])
+    assert _status_words_ok("Doanh thu dự kiến đạt 430 triệu USD.", [forecast])

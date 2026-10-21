@@ -31,8 +31,19 @@ SYSTEM = (
     "chỉ dùng thông tin có trong claim; mọi con số phải lấy nguyên từ claim; mỗi luận điểm là MỘT câu tiếng Việt "
     "và liệt kê claim_ids (đúng mã C-xxxxxxxx) làm căn cứ; is_fact=true cho câu nêu sự kiện/số liệu từ claim, "
     "is_fact=false cho nhận định suy luận của bạn. Không thêm kiến thức ngoài. Nếu hai claim khác nhau về số liệu, "
-    "nêu cả hai và không chọn bừa. Mỗi câu hỏi con 1-3 luận điểm."
+    "nêu cả hai và không chọn bừa. Mỗi câu hỏi con 1-3 luận điểm. Giữ đúng trạng thái của số liệu như trong claim: "
+    "số đã đạt thì viết 'đạt', không đổi thành 'dự báo', 'ước tính' hay 'dự kiến'; chỉ dùng các từ đó khi chính claim "
+    "dùng chúng. Không đổi phạm vi của số liệu (ví dụ không gọi doanh thu thực nhận là tổng doanh thu thị trường)."
 )
+HEDGE = re.compile(r"dự báo|ước tính|ước đạt|dự kiến|forecast|estimate", re.I)
+
+
+def _status_words_ok(text: str, claims: list[dict]) -> bool:
+    """Code check (Mission 3, evaluator round 1): a sentence may call a figure a forecast/estimate only if a cited
+    claim or its passage does; 'đạt' turned into 'dự báo' misstates the evidence."""
+    if not HEDGE.search(text):
+        return True
+    return any(HEDGE.search(c["content"] + " " + (c.get("passage") or "")) for c in claims)
 
 
 def _status(claim: dict) -> str:
@@ -66,6 +77,7 @@ def build(p3: dict, mode: str, tag: str) -> dict:
         main = [by_id[i] for i in v.get("main", []) if i in by_id]
         others = [c for c in claims if c["claim_id"] not in {m["claim_id"] for m in main}]
         subs.append({"id": s["id"], "text": s["text"], "verdict": v, "main": main, "others": others,
+                     "kind": s.get("data_kind") or "market",
                      "conflicts": conflicts, "by_id": by_id})
         if not v["refused"] and main:
             answered_input.append((s, main))
@@ -89,11 +101,17 @@ def build(p3: dict, mode: str, tag: str) -> dict:
         fact, note = p.is_fact, ""
         if p.is_fact:
             stats["llm_fact"] += 1
-            if valid_ids and _numbers_ok(p.text, [allowed[i] for i in valid_ids]):
-                stats["llm_fact_supported"] += 1
-            else:
+            cited_claims = [allowed[i] for i in valid_ids]
+            if not (valid_ids and _numbers_ok(p.text, cited_claims)):
                 fact, note = False, " (hạ xuống 'suy luận': thiếu claim ID hợp lệ hoặc số không khớp claim)"
                 stats["demoted"] += 1
+            elif not _status_words_ok(p.text, cited_claims):
+                fact, note = False, (" (hạ xuống 'suy luận': câu gọi số liệu là dự báo/ước tính trong khi claim "
+                                     "không nói vậy)")
+                stats["demoted"] += 1
+                stats["demoted_status_words"] = stats.get("demoted_status_words", 0) + 1
+            else:
+                stats["llm_fact_supported"] += 1
         cited = [allowed[i] for i in valid_ids]
         label = ""
         if any(_status(c) == "draft" for c in cited):
@@ -134,8 +152,11 @@ def build(p3: dict, mode: str, tag: str) -> dict:
                                   for h in s["verdict"].get("history", []) if h["claim_id"] in s["by_id"]],
                       "next_steps": s["verdict"].get("next_steps", []),
                       "conflicts": s["conflicts"],
-                      "reference_signals_cd": [{"claim_id": c["claim_id"], "content": c["content"],
-                                                "citation": _cite(c)} for c in s["others"]
+                      "reference_signals_cd": [{"claim_id": c["claim_id"], "citation": _cite(c),
+                                                "draft_flag": trust.is_draft(c, s["kind"]),
+                                                "content": c["content"] + (" [DỰ THẢO, chưa có hiệu lực]"
+                                                                           if trust.is_draft(c, s["kind"]) else "")}
+                                               for c in s["others"]
                                                if c["grade"] in ("C", "D")]} for s in subs],
             "gaps": gaps, "key_assumptions": assumptions[:3], "next_steps": next_steps, "stats": stats}
     memo["markdown"] = render(memo)
