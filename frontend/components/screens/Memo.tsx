@@ -7,7 +7,6 @@ import { CoreBadge, Icon, LevelBadge, SectionLabel, SyntheticTag, TierBadge, ton
 import { EmptyState } from "@/components/states";
 import { Inline } from "@/components/Markdown";
 import { RunProgress } from "@/components/RunProgress";
-import { SyntheticNote } from "@/components/SyntheticNote";
 import { FollowupBanner, FollowupBox } from "@/components/Followup";
 import { ClaimRef, Workspace } from "@/components/Workspace";
 import {
@@ -111,22 +110,95 @@ function Point({ p }: { p: MemoPoint }) {
   );
 }
 
-function NotEnough({ sub }: { sub: MemoSub }) {
+const isRefused = (s: MemoSub) => s.verdict.level === "Chưa đủ căn cứ" || s.refused_text !== null;
+
+/** Sub-questions without an A/B basis, one compact row each: reason, where to look next, and what was found anyway. */
+function RefusedList({
+  subs,
+  run,
+  core,
+  m3,
+}: {
+  subs: MemoSub[];
+  run: Run;
+  core: Set<string>;
+  m3: boolean;
+}) {
   return (
-    <div className="rounded-xl border-[1.5px] border-dashed border-danger-text bg-danger-bg/50 p-5">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-danger-text"><Icon name="dashed-circle" size={26} /></span>
-        <div>
-          <p className="text-[20px] font-bold text-danger-text">Chưa đủ căn cứ</p>
-          <p className="mt-1">
-            <strong>Còn thiếu:</strong> {sub.verdict.reason}
-          </p>
-          <p className="mt-1 text-[15px]">
-            Hệ thống không ước lượng và không viết kết luận cho câu hỏi con này. Con số hay nhận định nào không có claim
-            hạng A hoặc B đi kèm đều bị bỏ.
-          </p>
-        </div>
+    <section aria-labelledby="refused-h" className="rounded-xl border-[1.5px] border-dashed border-danger-text bg-danger-bg/30 p-4">
+      <h2 id="refused-h" className="flex items-center gap-2 text-[17px] font-bold text-danger-text">
+        <Icon name="dashed-circle" size={20} /> Chưa đủ căn cứ ({subs.length} câu hỏi con)
+      </h2>
+      <p className="text-[14px]">Hệ thống không viết kết luận và không ước lượng cho các câu hỏi con này.</p>
+      <ul className="mt-3 space-y-2">
+        {subs.map((s) => (
+          <RefusedRow key={s.id} sub={s} runId={run.id} core={m3 && core.has(s.id)} m3={m3}
+            current={run.subs.find((x) => x.id === s.id)?.verdict} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RefusedRow({ sub, runId, core, m3, current }: { sub: MemoSub; runId: string; core: boolean; m3: boolean; current?: Verdict }) {
+  const history = sub.history ?? [];
+  const historyIds = new Set(history.map((h) => h.claim_id));
+  const refSignals = sub.reference_signals_cd.filter((s) => !historyIds.has(s.claim_id));
+  // code-written steps end with "cho nội dung: <sub-question>", which is already printed just above
+  const steps = (sub.next_steps ?? []).map((s) => s.replace(` cho nội dung: ${sub.text}`, "."));
+  const extra = history.length + refSignals.length;
+  return (
+    <li id={`m-sub-${sub.id}`} className="scroll-mt-4 rounded-lg border border-line bg-surface p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="label-mono">{sub.id}</span>
+        {core && <CoreBadge />}
       </div>
+      <p className="mt-1 font-medium">{sub.text}</p>
+      <p className="mt-1 text-[14px] text-muted"><strong>Lý do:</strong> {sub.verdict.reason}</p>
+      {current && current.level !== sub.verdict.level && (
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-[14px] font-medium text-warn-text">
+          <Icon name="alert" size={15} /> Sau quyết định duyệt, mức đã đổi thành <LevelBadge level={current.level} />.
+        </p>
+      )}
+      {m3 && steps.length > 0 && (
+        <p className="mt-1 text-[14px]"><strong className="text-accent">Nên tìm tiếp:</strong> {steps.join(" ")}</p>
+      )}
+      <div className="no-print mt-1 flex flex-wrap gap-x-4 text-[13px]">
+        <Link href={`/runs/${encodeURIComponent(runId)}/evidence#sub-${sub.id}`} className="font-semibold text-accent underline">
+          Đã tìm những tài liệu nào
+        </Link>
+      </div>
+      {extra > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[13px] font-semibold">
+            Số liệu cũ và tín hiệu nguồn yếu, không dùng làm kết luận ({extra})
+          </summary>
+          <div className="mt-2 space-y-2">
+            {history.length > 0 && <HistoryList items={history} />}
+            {refSignals.length > 0 && <RefSignals items={refSignals} />}
+          </div>
+        </details>
+      )}
+    </li>
+  );
+}
+
+function RefSignals({ items }: { items: MemoSub["reference_signals_cd"] }) {
+  return (
+    <div className="rounded-lg border border-line bg-subtle p-3">
+      <p className="font-semibold">Tín hiệu tham khảo hạng C/D</p>
+      <p className="text-[13px] text-muted">Nguồn yếu: không đủ làm căn cứ kết luận, chỉ để tham khảo.</p>
+      <ul className="mt-2 space-y-2">
+        {items.map((s) => (
+          <li key={s.claim_id} className="flex flex-col gap-1 min-[620px]:flex-row min-[620px]:items-start min-[620px]:justify-between">
+            <div className="min-w-0 text-[14px]">
+              <p>{s.content}</p>
+              <p className="font-mono text-[12.5px] text-muted break-words">{s.citation}</p>
+            </div>
+            <div className="shrink-0"><ClaimRef id={s.claim_id} /></div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -138,7 +210,6 @@ function MainEvidence({ items }: { items: MemoClaimRef[] }) {
       <p className="flex items-center gap-1.5 font-semibold text-ok-text">
         <Icon name="check" size={16} /> Bằng chứng chính ({items.length})
       </p>
-      <p className="text-[13px] text-muted">Claim hạng A/B, còn trong hạn, dùng làm căn cứ. Bấm mã claim để xem đoạn gốc.</p>
       <ul className="mt-2 space-y-2">
         {items.map((c) => (
           <li key={c.claim_id} className="flex flex-col gap-1 rounded border border-line bg-surface p-2 min-[620px]:flex-row min-[620px]:items-start min-[620px]:justify-between">
@@ -207,7 +278,7 @@ function HistoryList({ items }: { items: NonNullable<MemoSub["history"]> }) {
   );
 }
 
-function NextSteps({ items, subId, runId, refused }: { items: string[]; subId: string; runId: string; refused: boolean }) {
+function NextSteps({ items }: { items: string[] }) {
   return (
     <div className="rounded-lg border border-accent/60 bg-surface p-3">
       <p className="flex items-center gap-1.5 font-semibold text-accent">
@@ -220,14 +291,6 @@ function NextSteps({ items, subId, runId, refused }: { items: string[]; subId: s
           {items.map((s, i) => <li key={i}>{s}</li>)}
         </ul>
       )}
-      {refused && (
-        <p className="no-print mt-2 text-[13px]">
-          <Link href={`/runs/${encodeURIComponent(runId)}/evidence#sub-${subId}`} className="font-semibold text-accent underline">
-            Xem hệ thống đã tìm những tài liệu nào cho câu hỏi con này
-          </Link>{" "}
-          (để phân biệt &quot;kho không có&quot; với &quot;có thể tìm sót&quot;).
-        </p>
-      )}
     </div>
   );
 }
@@ -238,16 +301,13 @@ function SubBlock({
   current,
   core,
   m3,
-  runId,
 }: {
   sub: MemoSub;
   index: number;
   current?: Verdict;
   core: boolean;
   m3: boolean;
-  runId: string;
 }) {
-  const refused = sub.verdict.level === "Chưa đủ căn cứ" || sub.refused_text !== null;
   const tier = sub.tier ?? tierOf(sub.verdict);
   const history = sub.history ?? [];
   const historyIds = new Set(history.map((h) => h.claim_id));
@@ -270,9 +330,7 @@ function SubBlock({
       )}
 
       <div className="mt-3 space-y-3">
-        {refused ? (
-          <NotEnough sub={sub} />
-        ) : sub.points.length === 0 ? (
+        {sub.points.length === 0 ? (
           <div className="flex gap-2 rounded-lg border border-warn-border bg-warn-bg p-3 text-[14px] text-warn-text">
             <span className="mt-0.5"><Icon name="alert" size={16} /></span>
             <p>
@@ -320,27 +378,9 @@ function SubBlock({
 
         {history.length > 0 && <HistoryList items={history} />}
 
-        {refSignals.length > 0 && (
-          <div className="rounded-lg border border-line bg-subtle p-3">
-            <p className="font-semibold">Tín hiệu tham khảo hạng C/D</p>
-            <p className="text-[13px] text-muted">
-              Nguồn yếu: không đủ làm căn cứ kết luận, chỉ để tham khảo.
-            </p>
-            <ul className="mt-2 space-y-2">
-              {refSignals.map((s) => (
-                <li key={s.claim_id} className="flex flex-col gap-1 min-[620px]:flex-row min-[620px]:items-start min-[620px]:justify-between">
-                  <div className="min-w-0 text-[14px]">
-                    <p>{s.content}</p>
-                    <p className="font-mono text-[12.5px] text-muted break-words">{s.citation}</p>
-                  </div>
-                  <div className="shrink-0"><ClaimRef id={s.claim_id} /></div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {refSignals.length > 0 && <RefSignals items={refSignals} />}
 
-        {m3 && <NextSteps items={sub.next_steps ?? []} subId={sub.id} runId={runId} refused={refused} />}
+        {m3 && <NextSteps items={sub.next_steps ?? []} />}
       </div>
     </section>
   );
@@ -357,11 +397,6 @@ function TrustSummary({ memo, core, coreMarked }: { memo: Memo; core: Set<string
     uncertain: "border-warn-border",
     refused: "border-danger-text border-dashed",
   };
-  const meaning: Record<Tier, string> = {
-    supported: "Từ 2 nguồn A/B độc lập trở lên, số liệu còn trong hạn, không có mâu thuẫn.",
-    uncertain: "Có căn cứ hạng A/B nhưng còn lý do phải dè dặt (xem từng câu hỏi con).",
-    refused: "Không có claim hạng A/B dùng được: hệ thống không viết kết luận, không ước lượng.",
-  };
   return (
     <section aria-labelledby="tiers-h">
       <SectionLabel>Tóm tắt: điều gì tin được</SectionLabel>
@@ -373,9 +408,17 @@ function TrustSummary({ memo, core, coreMarked }: { memo: Memo; core: Set<string
               <TierBadge tier={t} />
               <span className="text-[14px] font-semibold tabular">{tiers[t]?.length ?? 0} câu hỏi con</span>
             </div>
-            <p className="mt-1 text-[13px] text-muted">{meaning[t]}</p>
             {(tiers[t] ?? []).length === 0 ? (
               <p className="mt-2 text-[14px] font-medium">Không có câu hỏi con nào.</p>
+            ) : t === "refused" ? (
+              // the full refused list follows below the details, so only the IDs here
+              <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                {tiers[t].map((id) => (
+                  <a key={id} href={`#m-sub-${id}`} className="font-mono text-[13px] font-medium text-accent underline">
+                    {id}{coreMarked && core.has(id) ? " (chính)" : ""}
+                  </a>
+                ))}
+              </p>
             ) : (
               <ul className="mt-2 space-y-1.5">
                 {tiers[t].map((id) => {
@@ -395,12 +438,6 @@ function TrustSummary({ memo, core, coreMarked }: { memo: Memo; core: Set<string
           </div>
         ))}
       </div>
-      {!memo.tiers && (
-        <p className="mt-2 text-[13px] text-muted">
-          Memo này được viết trước khi có phân nhóm; nhóm ở trên được suy ra từ mức chắc chắn của từng câu hỏi con theo cùng
-          quy tắc của máy chủ (Cao = có thể tin, Trung bình/Thấp = chưa chắc chắn).
-        </p>
-      )}
       {memo.tiers && !coreMarked && (
         <p className="mt-2 text-[13px] text-muted">
           Lần chạy này không đánh dấu câu hỏi con chính, nên khi tính mức tổng thể mọi câu hỏi con đều được tính là chính.
@@ -431,6 +468,8 @@ function MemoView({ memo, run }: { memo: Memo; run: Run }) {
   const { ids: core, marked: coreMarked } = coreIds(run);
   const total = memo.subs.length;
   const refusedCount = memo.subs.filter((s) => s.verdict.level === "Chưa đủ căn cứ").length;
+  const answered = memo.subs.filter((s) => !isRefused(s));
+  const refusedSubs = memo.subs.filter(isRefused);
   const noPoints = memo.subs.filter((s) => s.verdict.level !== "Chưa đủ căn cứ" && s.points.length === 0).length;
   const note =
     !m3 && memo.overall.level !== "Chưa đủ căn cứ" && refusedCount > 0
@@ -457,50 +496,38 @@ function MemoView({ memo, run }: { memo: Memo; run: Run }) {
         <div className="mt-2">
           <ConfidenceBand level={memo.overall.level} reason={memo.overall.reason} note={note} />
         </div>
-        {m3 && (
-          <p className="mt-2 text-[13px] text-muted">
-            Mức tổng thể do code tính trên các câu hỏi con chính: chỉ cần một câu hỏi con chính &quot;Chưa đủ căn cứ&quot; là câu
-            hỏi gốc chưa có kết luận.
-          </p>
-        )}
       </section>
 
       <TrustSummary memo={memo} core={core} coreMarked={coreMarked} />
 
-      <div>
-        <SectionLabel>Chi tiết theo câu hỏi con</SectionLabel>
-        <div className="mt-4 space-y-6">
-          {memo.subs.map((s, i) => (
-            <SubBlock
-              key={s.id}
-              sub={s}
-              index={i + 1}
-              current={run.subs.find((x) => x.id === s.id)?.verdict}
-              core={core.has(s.id)}
-              m3={m3}
-              runId={run.id}
-            />
-          ))}
+      {answered.length > 0 && (
+        <div>
+          <SectionLabel>Chi tiết theo câu hỏi con</SectionLabel>
+          <div className="mt-4 space-y-6">
+            {answered.map((s, i) => (
+              <SubBlock
+                key={s.id}
+                sub={s}
+                index={i + 1}
+                current={run.subs.find((x) => x.id === s.id)?.verdict}
+                core={core.has(s.id)}
+                m3={m3}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-
-      <ListSection title="Khoảng trống dữ liệu" items={memo.gaps} empty="Memo không ghi khoảng trống nào." />
-      <ListSection title="Giả định chính / điều có thể làm kết luận sai" items={memo.key_assumptions} empty="Memo không ghi giả định nào." />
-      {m3 ? (
-        <p className="border-t border-line pt-6 text-[14px] text-muted">
-          Hướng tìm tiếp (&quot;Nên tìm tiếp ở đâu&quot;) nằm trong từng câu hỏi con ở trên.
-        </p>
-      ) : (
-        <ListSection title="Bước xác minh tiếp theo" items={memo.next_steps} empty="Memo không đề xuất bước nào." />
       )}
+
+      {refusedSubs.length > 0 && <RefusedList subs={refusedSubs} run={run} core={core} m3={m3} />}
+
+      {/* M3: gaps repeat the refused list above, so they are shown only for older memos */}
+      {!m3 && <ListSection title="Khoảng trống dữ liệu" items={memo.gaps} empty="Memo không ghi khoảng trống nào." />}
+      <ListSection title="Giả định chính / điều có thể làm kết luận sai" items={memo.key_assumptions} empty="Memo không ghi giả định nào." />
+      {!m3 && <ListSection title="Bước xác minh tiếp theo" items={memo.next_steps} empty="Memo không đề xuất bước nào." />}
 
       <footer className="rounded-lg border border-ink/60 bg-subtle p-4 text-[14px]">
         <p className="font-semibold">Về memo này</p>
         <ul className="mt-1 list-disc space-y-1 pl-5">
-          <li>
-            Memo do AI soạn và mọi claim trong đó đã qua kiểm tra trích dẫn tự động (bằng code). Hãy mở đoạn gốc của từng
-            claim trước khi dùng.
-          </li>
           <li>
             Duyệt của chuyên viên: <strong>{confirmed}</strong> claim đã xác nhận, <strong>{rejected}</strong> claim đã loại khỏi
             memo.
@@ -511,7 +538,6 @@ function MemoView({ memo, run }: { memo: Memo; run: Run }) {
               &quot;suy luận&quot;; hãy đọc lại các câu này.
             </li>
           )}
-          <li>Kho có tài liệu SYNTHETIC (tự soạn); chúng không bao giờ được dùng để kết luận.</li>
         </ul>
       </footer>
     </article>
@@ -663,13 +689,7 @@ export default function MemoPage() {
   return (
     <div className="space-y-6">
       <div className="no-print flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-3xl">
-          <SectionLabel>Bước 4: Memo</SectionLabel>
-          <p className="mt-1 text-muted">
-            Bấm vào mã claim bên cạnh mỗi câu để xem đoạn gốc. Mức chắc chắn luôn đi kèm lý do; phần &quot;Chưa đủ căn cứ&quot;
-            được giữ nguyên thay vì đoán.
-          </p>
-        </div>
+        <SectionLabel>Bước 4: Memo</SectionLabel>
         {memo && (
           <div className="flex flex-wrap gap-2">
             <DocxButton runId={run.id} />
@@ -685,8 +705,6 @@ export default function MemoPage() {
           cũng giữ cảnh báo này.
         </p>
       )}
-
-      <div className="no-print"><SyntheticNote compact /></div>
 
       <FollowupBanner run={run} />
 

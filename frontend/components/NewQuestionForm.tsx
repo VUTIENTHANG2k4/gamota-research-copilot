@@ -61,7 +61,7 @@ export function NewQuestionForm({
         if (r.status === "queued" || r.status === "running") {
           setPhase((p) => (p.kind === "running" ? { ...p, stage: r.stage } : p));
         } else {
-          router.push(`/runs/${encodeURIComponent(runId)}`);
+          router.push(`/runs/${encodeURIComponent(runId)}${r.status === "done" ? "/memo" : ""}`);
         }
       } catch (e) {
         if (!alive) return;
@@ -98,11 +98,6 @@ export function NewQuestionForm({
       <h1 id="new-h" className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">
         Đặt một câu hỏi nghiên cứu thị trường game
       </h1>
-      <p className="mt-2 text-muted">
-        Hệ thống tìm trong kho 36 tài liệu cố định, trích các khẳng định (claim) kèm đoạn gốc, chấm hạng nguồn A đến D, đối
-        soát mâu thuẫn rồi soạn memo một trang với mức chắc chắn và lý do. Khi chưa đủ căn cứ, memo ghi rõ &quot;Chưa đủ căn
-        cứ&quot; thay vì đoán.
-      </p>
       <form onSubmit={submit} className="mt-4">
         <label htmlFor="q" className="block text-[14px] font-semibold">Câu hỏi của bạn</label>
         <textarea
@@ -117,8 +112,7 @@ export function NewQuestionForm({
           placeholder="Ví dụ: Giới hạn thời gian chơi game của người dưới 18 tuổi theo quy định hiện hành là bao nhiêu?"
         />
         <p id="q-hint" className={`mt-1 text-[13px] ${len > 0 && !valid ? "font-semibold text-danger-text" : "text-muted"}`}>
-          {len}/{MAX} ký tự. Cần từ {MIN} đến {MAX} ký tự. Chỉ nhập câu hỏi về thông tin công khai: model miễn phí ghi log sử
-          dụng, không nhập dữ liệu nội bộ hay dữ liệu cá nhân.
+          {len}/{MAX} ký tự. Không nhập dữ liệu nội bộ hay dữ liệu cá nhân (model miễn phí ghi log).
         </p>
         <button type="submit" disabled={!valid || busy || !!blockedReason} className="btn btn-primary mt-3">
           {busy ? "Đang chạy..." : "Chạy nghiên cứu"}

@@ -186,10 +186,7 @@ export function FollowupBox({ run }: { run: Run }) {
     <section aria-labelledby="fu-box-h" className="no-print card border-2 !border-accent/70">
       <SectionLabel>Nghiên cứu tiếp</SectionLabel>
       <h2 id="fu-box-h" className="mt-1 text-xl font-semibold">Hỏi tiếp, giữ nguyên bối cảnh của lần chạy này</h2>
-      <p className="mt-1 text-[14px] text-muted">
-        Câu hỏi mới chạy thành một lần nghiên cứu mới (dùng model, vài phút). Lần chạy này giữ nguyên. Chuỗi nghiên cứu tiếp
-        tối đa {MAX_CHAIN} bước.
-      </p>
+      <p className="mt-1 text-[14px] text-muted">Mất vài phút; tối đa {MAX_CHAIN} bước nối tiếp.</p>
 
       <form onSubmit={submit} className="mt-4 space-y-4">
         <div>
@@ -211,17 +208,14 @@ export function FollowupBox({ run }: { run: Run }) {
 
         <fieldset className="rounded-lg border border-line p-4">
           <legend className="px-1 text-[14px] font-semibold">Bối cảnh kế thừa từ lần chạy này</legend>
-          <p className="text-[14px]">
-            <span className="text-muted">Câu hỏi trước: </span>
-            <span className="font-medium">{run.question}</span>
-          </p>
-          <div className="mt-3">
-            <ContextList ctx={ctx} />
-          </div>
-          <p className="mt-3 text-[13px] text-muted">
-            Bản xem trước theo dữ liệu đang hiển thị; máy chủ tự lập lại bối cảnh khi nhận câu hỏi. Lời văn của memo không
-            được kế thừa. Nếu câu hỏi mới không liên quan, hệ thống sẽ không dùng bối cảnh này và báo rõ ở lần chạy mới.
-          </p>
+          <details>
+            <summary className="cursor-pointer text-[14px] font-medium text-accent">
+              Xem bối cảnh sẽ gửi kèm (phạm vi, khoảng trống, quyết định duyệt)
+            </summary>
+            <div className="mt-3">
+              <ContextList ctx={ctx} />
+            </div>
+          </details>
           <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-ink/40 bg-subtle p-3 text-[14px]">
             <input
               type="checkbox"
@@ -231,8 +225,7 @@ export function FollowupBox({ run }: { run: Run }) {
               className="mt-1 h-4 w-4 accent-[var(--color-accent)]"
             />
             <span>
-              <strong>Bỏ bối cảnh kế thừa</strong>: hỏi như một câu hỏi mới, không gửi quyết định, phạm vi, khoảng trống và
-              quyết định duyệt ở trên (lần chạy mới vẫn ghi là tiếp nối từ lần này).
+              <strong>Bỏ bối cảnh kế thừa</strong>: hỏi như một câu hỏi mới.
             </span>
           </label>
           {!inherit && (

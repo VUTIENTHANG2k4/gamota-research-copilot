@@ -105,12 +105,7 @@ function ConflictCard({ e, n }: { e: Entry; n: number }) {
         <div>
           <SectionLabel>Giải thích</SectionLabel>
           <p className="mt-1"><Inline text={c.explanation || "Không có giải thích."} /></p>
-          {byCode ? (
-            <p className="mt-1 text-[13px] text-muted">
-              Câu giải thích do code viết theo quy tắc cố định từ ngày công bố, ngày dữ liệu, nguồn gốc và hạng nguồn; code
-              không đọc nội dung để hiểu vì sao hai con số khác nhau.
-            </p>
-          ) : (
+          {byCode ? null : (
             <p className="mt-1 text-[13px] text-warn-text">
               Do AI viết; có thể vượt quá bằng chứng trong kho. Hãy mở đoạn gốc của hai claim để kiểm tra.
             </p>
@@ -164,12 +159,6 @@ export default function ReconcilePage() {
       <div className="max-w-3xl">
         <SectionLabel>Bước 3: Đối soát mâu thuẫn</SectionLabel>
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">Đối soát mâu thuẫn</h1>
-        <p className="mt-2 text-muted">
-          Hai claim cùng chủ đề nhưng con số lệch nhau (code tìm cặp lệch từ 10% trở lên). Mỗi cặp có nguyên nhân và gợi ý
-          dùng con số nào cho mục đích nào. Cặp nào giải thích được bằng ngày và hạng nguồn (bản cập nhật, số liệu cũ, kỳ
-          trước, nguồn yếu hơn) thì <strong>code xếp loại</strong>; chỉ cặp giữa hai nguồn A/B cùng kỳ mới nhờ{" "}
-          <strong>AI gán nguyên nhân</strong>. Trang này chỉ để đọc; quyết định về từng claim nằm ở bước Kho bằng chứng.
-        </p>
       </div>
 
       {run.review_summary.rejected > 0 && (

@@ -79,7 +79,7 @@ function Row({ r, onDeleted }: { r: RunSummary; onDeleted: () => void }) {
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Link href={`/runs/${encodeURIComponent(r.id)}`} className="btn btn-secondary !min-h-10">
+        <Link href={`/runs/${encodeURIComponent(r.id)}${r.has_result && !active ? "/memo" : ""}`} className="btn btn-secondary !min-h-10">
           {active ? "Xem tiến độ" : r.status === "needs_clarification" ? "Trả lời câu hỏi làm rõ" : r.has_result ? "Mở kết quả" : "Mở"}
         </Link>
         {!confirming ? (
@@ -141,7 +141,6 @@ export function History({ reloadToken }: { reloadToken: number }) {
       <div>
         <SectionLabel>Lịch sử</SectionLabel>
         <h2 id="hist-h" className="mt-1 text-xl font-semibold">Các câu hỏi đã hỏi</h2>
-        <p className="text-[14px] text-muted">Lưu trên máy chủ, vẫn còn sau khi đóng trang. Quyết định duyệt claim cũng được lưu.</p>
       </div>
       {load.kind === "loading" && <Loading what="lịch sử câu hỏi" />}
       {load.kind === "error" && (

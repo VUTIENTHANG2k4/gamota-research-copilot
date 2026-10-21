@@ -151,9 +151,8 @@ export default function BriefPage() {
             </dl>
           </section>
 
-          <section className="card" aria-labelledby="sub-h">
+          <section className="card" aria-label="Câu hỏi con">
             <SectionLabel>Câu hỏi con ({brief.sub_questions.length})</SectionLabel>
-            <h2 id="sub-h" className="mt-1 text-xl font-semibold">Hệ thống tìm bằng chứng cho từng câu hỏi con</h2>
             {brief.sub_questions.length === 0 ? (
               <div className="mt-4"><EmptyState title="Brief không có câu hỏi con nào" /></div>
             ) : (
@@ -169,15 +168,10 @@ export default function BriefPage() {
                 ))}
               </ol>
             )}
-            {brief.sub_questions.some((s) => s.core) ? (
-              <p className="mt-3 text-[13px] text-muted">
-                Câu hỏi con chính trả lời trực tiếp câu hỏi gốc: chỉ cần một câu hỏi con chính &quot;Chưa đủ căn cứ&quot; là câu
-                hỏi gốc chưa có kết luận. Các câu hỏi con khác là phụ.
-              </p>
-            ) : null}
           </section>
 
-          {brief.clarifying_questions.length > 0 && (
+          {/* Once research has run, leftover clarifying questions only confuse: they are not waiting for an answer. */}
+          {brief.clarifying_questions.length > 0 && run.subs.length === 0 && (
             <section className="card" aria-labelledby="clar2-h">
               <SectionLabel>Câu hỏi làm rõ</SectionLabel>
               <h2 id="clar2-h" className="mt-1 text-xl font-semibold">Hệ thống còn muốn hỏi thêm</h2>
@@ -187,11 +181,9 @@ export default function BriefPage() {
             </section>
           )}
 
-          <p className="text-[14px] text-muted">Brief do AI soạn từ câu hỏi của bạn; hãy đọc lại để chắc rằng nó đúng ý.</p>
-
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={`/runs/${id}/evidence`} className="btn btn-primary">Xem kho bằng chứng</Link>
-            <Link href={`/runs/${id}/memo`} className="btn btn-secondary">Đến thẳng memo</Link>
+            <Link href={`/runs/${id}/memo`} className="btn btn-primary">Xem memo</Link>
+            <Link href={`/runs/${id}/evidence`} className="btn btn-secondary">Xem kho bằng chứng</Link>
           </div>
         </>
       )}

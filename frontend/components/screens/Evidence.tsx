@@ -131,13 +131,6 @@ function Searched({ sub, sources, query, refused }: { sub: Sub; sources: SourceM
           <span className="font-mono">{query}</span>
         </p>
       )}
-      {refused && (
-        <p className="text-[14px]">
-          Cách đọc: nếu không đoạn nào dưới đây nói về đúng chủ đề, nhiều khả năng <strong>kho không có</strong> dữ liệu này.
-          Nếu có đoạn đúng chủ đề mà vẫn không có claim hạng A/B, hệ thống <strong>có thể đã tìm hoặc trích sót</strong>: hãy
-          đọc đoạn để kiểm tra.
-        </p>
-      )}
       {sub.retrieved.length === 0 ? (
         <p className="font-medium">Không truy xuất được đoạn nào cho câu hỏi con này.</p>
       ) : (
@@ -196,6 +189,7 @@ function SubSection({ sub, core, sources }: { sub: Sub; core: boolean; sources: 
   const hasTier = !!sub.verdict.tier;
   const query = run.brief?.sub_questions.find((q) => q.id === sub.id)?.search_query;
   const labelled = sub.claims.filter((c) => c.answers).length;
+  const synthCount = sub.claims.filter((c) => c.is_synthetic).length;
   return (
     <section id={`sub-${sub.id}`} className="card scroll-mt-4" aria-labelledby={`sub-h-${sub.id}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -214,6 +208,11 @@ function SubSection({ sub, core, sources }: { sub: Sub; core: boolean; sources: 
           <LevelBadge level={sub.verdict.level} />
           <span><strong>Vì sao:</strong> {sub.verdict.reason}</span>
         </p>
+        {synthCount > 0 && (
+          <p className="text-[13px] font-medium text-warn-text">
+            Mức này chỉ tính tài liệu thật: {synthCount} claim SYNTHETIC bên dưới không được dùng để kết luận.
+          </p>
+        )}
         {sub.claims.length > 0 && labelled === 0 && (
           <p className="text-[13px] text-muted">
             Các claim ở đây chưa có nhãn mức liên quan (trả lời trực tiếp / một phần / bối cảnh): lần chạy dùng phiên bản cũ.
@@ -284,11 +283,6 @@ export default function EvidencePage() {
       <div className="max-w-3xl">
         <SectionLabel>Bước 2: Kho bằng chứng</SectionLabel>
         <h1 className="mt-1 text-[26px] font-semibold leading-[1.35] tracking-[-0.015em]">Kho bằng chứng</h1>
-        <p className="mt-2 text-muted">
-          Mỗi <strong>claim</strong> (một khẳng định trích từ tài liệu) kèm hạng nguồn A đến D. Bấm vào claim để xem đoạn
-          gốc bên cạnh, rồi <strong>Xác nhận</strong> hoặc <strong>Loại khỏi memo</strong>. Mức chắc chắn của từng câu hỏi
-          con được code tính lại ngay sau mỗi quyết định; memo chỉ đổi khi bạn viết lại memo.
-        </p>
         <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
           <span><strong className="tabular">{valid.length}</strong> claim đạt kiểm tra trích dẫn</span>
           <span className="inline-flex items-center gap-1 font-semibold text-danger-text">
@@ -302,7 +296,7 @@ export default function EvidencePage() {
         </p>
       </div>
 
-      <SyntheticNote />
+      {synth > 0 && <SyntheticNote compact />}
 
       <FollowupBanner run={run} />
 

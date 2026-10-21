@@ -31,10 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">
           <AuthGate>{children}</AuthGate>
         </main>
-        <footer className="no-print mx-auto mt-4 w-full max-w-[1360px] px-4 pb-10 text-[13px] text-muted sm:px-8">
-          Bản MVP/prototype do AI hỗ trợ soạn. Mọi con số lấy từ máy chủ và kho 36 tài liệu cố định; tài liệu SYNTHETIC là
-          tài liệu tự soạn để thử hệ thống, không dùng để kết luận.
-        </footer>
+        <div className="pb-10" />
       </body>
     </html>
   );
