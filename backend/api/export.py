@@ -27,10 +27,25 @@ def memo_docx(run: dict, effective_p3: dict, reviews: dict[str, dict], stale: bo
     n_rej = sum(1 for r in reviews.values() if r["state"] == "rejected")
     d.add_paragraph(f"Duyệt của chuyên viên: {n_ok} claim đã xác nhận, {n_rej} claim bị loại khỏi memo."
                     + (" LƯU Ý: memo này chưa phản ánh các thay đổi duyệt gần nhất." if stale else ""))
+    fu = memo.get("followup")
+    if fu:
+        d.add_paragraph(f"Nghiên cứu tiếp từ: {fu['parent_question']} ({fu['parent_id']}). "
+                        + (f"Kế thừa phạm vi và {fu.get('inherited', 0)} quyết định duyệt."
+                           if fu.get("related") and fu.get("inherit") else "Không kế thừa bối cảnh."))
+    tiers = memo.get("tiers")
+    if tiers:  # Mission 3: what can be trusted, what is uncertain, what has no basis
+        d.add_heading("Tóm tắt: điều gì tin được", 2)
+        for key, label in (("supported", "Có thể tin"), ("uncertain", "Chưa chắc chắn"), ("refused", "Chưa có căn cứ")):
+            d.add_paragraph(f"{label}: {', '.join(tiers.get(key) or []) or 'không có câu hỏi con nào'}",
+                            style="List Bullet")
     for s in memo["subs"]:
-        d.add_heading(f"{s['id']}. {s['text']}", 2)
+        core = " (câu hỏi con chính)" if s["id"] in (memo.get("core") or []) else ""
+        d.add_heading(f"{s['id']}. {s['text']}{core}", 2)
         if s["refused_text"]:
             d.add_paragraph(f"Chưa đủ căn cứ. {s['verdict']['reason']}")
+            if "searched" in s:
+                found = ", ".join(f"{r['source_id']} tr.{r['page']}" for r in s["searched"])
+                d.add_paragraph("Đã tìm trong: " + (found or "không tìm thấy đoạn tài liệu nào trong kho"))
         else:
             v = s["verdict"]
             d.add_paragraph(f"Mức chắc chắn: {LEVEL_VI.get(v['level'], v['level'])}. {v['reason']}")
@@ -38,14 +53,22 @@ def memo_docx(run: dict, effective_p3: dict, reviews: dict[str, dict], stale: bo
                 tag = "" if p["is_fact"] else " [suy luận]"
                 d.add_paragraph(f"{p['text']}{tag} ({'; '.join(p['citations'])})", style="List Bullet")
             for x in s["conflicts"]:
-                d.add_paragraph(f"Mâu thuẫn ({x['cause']}, {x['status']}): {x['explanation']} Gợi ý: {x.get('usage_suggestion', '')}",
+                if x.get("decided_by", "llm") == "llm":
+                    d.add_paragraph(f"Mâu thuẫn ({x['cause']}, {x['status']}): {x['explanation']} "
+                                    f"Gợi ý: {x.get('usage_suggestion', '')}", style="List Bullet")
+        for u in s.get("uncertain", []):
+            d.add_paragraph(f"Chưa chắc chắn: {u['text']}", style="List Bullet")
+        if s.get("history"):
+            d.add_paragraph("Số liệu lịch sử (không dùng làm kết luận):")
+            for h in s["history"]:
+                d.add_paragraph(f"Dữ liệu {h['data_date']}: {h['content']} ({h['citation']}). {h['text']}",
                                 style="List Bullet")
         if s["reference_signals_cd"]:
             d.add_paragraph("Tín hiệu tham khảo hạng C/D (không dùng làm kết luận):")
             for c in s["reference_signals_cd"]:
                 d.add_paragraph(f"{c['content']} ({c['citation']})", style="List Bullet")
     for title, items in (("Khoảng trống", memo["gaps"]), ("Giả định chính (kết luận sai nếu...)", memo["key_assumptions"]),
-                         ("Bước xác minh tiếp theo", memo["next_steps"])):
+                         ("Nên tìm hiểu tiếp ở đâu", memo["next_steps"])):
         d.add_heading(title, 2)
         for it in items:
             d.add_paragraph(it, style="List Bullet")
