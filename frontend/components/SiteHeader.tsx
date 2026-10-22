@@ -18,7 +18,6 @@ export function SiteHeader() {
   const runId = m ? decodeURIComponent(m[1]) : null;
   const sub = m?.[2] ?? "";
   const onHome = pathname === "/" || !!m;
-  const onLimits = pathname.startsWith("/limitations");
   const router = useRouter();
   const [user, setUser] = useState<string | null>(null);
   useEffect(() => {
@@ -48,17 +47,6 @@ export function SiteHeader() {
           >
             Câu hỏi
           </Link>
-          <Link
-            href="/limitations"
-            aria-current={onLimits ? "page" : undefined}
-            className={`rounded border px-2.5 py-1.5 ${
-              onLimits
-                ? "border-warn-border bg-warn-bg text-warn-text"
-                : "border-warn-border bg-warn-bg/60 text-warn-text hover:bg-warn-bg"
-            }`}
-          >
-            Giới hạn đã biết
-          </Link>
           {user && (
             <span className="flex items-center gap-2 text-[14px] font-normal text-muted">
               <span>
@@ -79,7 +67,13 @@ export function SiteHeader() {
         </nav>
       </div>
       {runId ? (
-        <nav aria-label="Các bước" className="mx-auto mt-1 flex w-full max-w-[1360px] gap-1 overflow-x-auto px-4 sm:px-8">
+        <nav aria-label="Các bước" className="mx-auto mt-1 flex w-full max-w-[1360px] items-center gap-1 overflow-x-auto px-4 sm:px-8">
+          <Link
+            href="/"
+            className="mr-2 inline-flex items-center gap-1 whitespace-nowrap rounded border border-ink/40 px-2.5 py-1 text-[14px] font-medium text-ink hover:border-accent hover:text-accent"
+          >
+            <span aria-hidden>←</span> Về trang câu hỏi
+          </Link>
           {STEPS.map((s, i) => {
             const active = sub === s.slug;
             return (

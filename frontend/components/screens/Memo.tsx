@@ -646,7 +646,7 @@ function PrintLimitations() {
       ) : (
         <p className="mt-1">
           Bản MVP: memo do AI soạn, cần mở đoạn gốc của từng claim trước khi dùng. Tài liệu SYNTHETIC là tài liệu tự soạn,
-          không dùng để kết luận. Danh sách giới hạn đầy đủ nằm ở trang Giới hạn đã biết.
+          không dùng để kết luận.
         </p>
       )}
     </section>

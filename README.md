@@ -96,7 +96,7 @@ Ngoài ra:
 
 - **Nghiên cứu tiếp:** hỏi tiếp từ một memo đã xong. Hệ thống kế thừa phạm vi, khoảng trống và quyết định duyệt (kể cả nguồn đã bị loại). Người dùng xem trước và bỏ được phần kế thừa. Câu hỏi không liên quan thì không kế thừa gì. Tối đa 3 bước nối tiếp.
 - **Lịch sử:** lưu trên máy chủ, mọi người dùng thấy chung.
-- **Trang "Giới hạn đã biết":** liệt kê trung thực những gì MVP chưa làm được.
+- **Nút "Về trang câu hỏi"** trên mọi trang kết quả để quay lại màn ban đầu.
 
 ### Đăng nhập
 
@@ -171,7 +171,7 @@ gamota-research-copilot/
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/               # Next.js + Tailwind, tiếng Việt
-│   ├── app/                #   trang: câu hỏi, lượt chạy (brief, bằng chứng, đối soát, memo), giới hạn, đăng nhập
+│   ├── app/                #   trang: câu hỏi, lượt chạy (brief, bằng chứng, đối soát, memo), đăng nhập
 │   ├── components/
 │   └── tests/mock_api.py   #   backend giả để thử giao diện không tốn hạn mức
 ├── .github/workflows/      # CI: test backend và build frontend
@@ -229,4 +229,4 @@ Thử giao diện không cần mô hình: `.venv\Scripts\python frontend\tests\m
 - Đăng nhập đơn giản: không có đăng ký, quên mật khẩu hay phân quyền, mọi người dùng chung một lịch sử. Đủ để chặn người lạ dùng hạn mức mô hình, không phải bảo mật cho dữ liệu thật.
 - Endpoint miễn phí `:free` có ghi log sử dụng: chỉ gửi tài liệu công khai và SYNTHETIC, không nhập dữ liệu thật của Gamota hoặc dữ liệu cá nhân.
 
-Danh sách đầy đủ có ở trang "Giới hạn đã biết" trong giao diện.
+Giới hạn cũng được in kèm khi lưu memo thành PDF và ghi trong tệp Word xuất ra.

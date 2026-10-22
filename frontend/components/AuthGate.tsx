@@ -6,8 +6,8 @@ import { api } from "@/lib/api";
 import { currentSession, redirectToLogin } from "@/lib/auth";
 import { Loading } from "./states";
 
-// Pages anyone can open: the sign-in page and the known-limitations page.
-const PUBLIC = ["/login", "/limitations"];
+// Pages anyone can open: the sign-in page.
+const PUBLIC = ["/login"];
 
 /** Shows the page only when sign-in is off on the server, or the browser holds a valid session. */
 export function AuthGate({ children }: { children: ReactNode }) {
