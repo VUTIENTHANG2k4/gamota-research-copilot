@@ -144,7 +144,8 @@ function RefusedRow({ sub, runId, core, m3, current }: { sub: MemoSub; runId: st
   const history = sub.history ?? [];
   const historyIds = new Set(history.map((h) => h.claim_id));
   const refSignals = sub.reference_signals_cd.filter((s) => !historyIds.has(s.claim_id));
-  // code-written steps end with "cho nội dung: <sub-question>", which is already printed just above
+  // memos saved before 2026-10-22 end their steps with "cho nội dung: <sub-question>" (printed just above);
+  // newer memos no longer do, so this only tidies old saved runs and is a no-op otherwise
   const steps = (sub.next_steps ?? []).map((s) => s.replace(` cho nội dung: ${sub.text}`, "."));
   const extra = history.length + refSignals.length;
   return (

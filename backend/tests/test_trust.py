@@ -200,6 +200,11 @@ def test_search_can_restrict_to_real_or_synthetic_documents():
     assert real and not any(c["is_synthetic"] for c in real)
     assert syn and all(c["is_synthetic"] for c in syn)
     assert {c["source_id"] for c in real} & {"S004", "S007", "S008", "S014"}  # real revenue sources reachable
+    # one scoring pass gives exactly the two separate searches, for several queries and with SYNTHETIC off
+    for query in (q, "quy định phát hành game online giấy phép G1", "retention D7 idle RPG"):
+        two = idx.search(query, 8, per_source=2, synthetic=False) + idx.search(query, 4, per_source=2, synthetic=True)
+        assert idx.search_split(query, 8, 4, per_source=2) == two
+        assert idx.search_split(query, 8, 0, per_source=2) == idx.search(query, 8, per_source=2, synthetic=False)
 
 
 def test_memo_lists_what_was_searched_for_refused_subquestions():
@@ -256,10 +261,9 @@ def test_retrieve_synthetic_switch(monkeypatch):
     from app import pipeline
 
     class FakeIndex:
-        def search(self, q, k, per_source, synthetic):
-            sid = "SYN01" if synthetic else "S004"
-            return [{"chunk_id": f"{sid}-p1-0", "source_id": sid, "page": 1, "score": 1.0, "is_synthetic": synthetic,
-                     "text": "x"}]
+        def search_split(self, q, k_real, k_syn, per_source):
+            return [{"chunk_id": f"{sid}-p1-0", "source_id": sid, "page": 1, "score": 1.0, "is_synthetic": syn,
+                     "text": "x"} for sid, syn, k in (("S004", False, k_real), ("SYN01", True, k_syn)) if k]
 
     class Brief:
         needs_clarification = False

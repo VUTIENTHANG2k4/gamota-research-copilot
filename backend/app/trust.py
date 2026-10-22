@@ -145,13 +145,12 @@ def next_steps(sub_text: str, kind: str, codes: set[str], refused: bool, main: l
             steps.append("Cần dữ liệu nội bộ của Gamota (dashboard/BI vận hành của chính game đó); kho tài liệu công khai "
                          "không thể có số này.")
         elif kind == "legal":
-            steps.append("Cần văn bản pháp luật gốc đang có hiệu lực (Công báo, cơ sở dữ liệu văn bản pháp luật) cho nội dung: "
-                         f"{sub_text}")
+            # the sub-question text is not repeated here: every place that shows a step shows its sub-question too
+            steps.append("Cần văn bản pháp luật gốc đang có hiệu lực (Công báo, cơ sở dữ liệu văn bản pháp luật).")
         elif kind == "reviews":
             steps.append("Cần đánh giá của người chơi trong 6 tháng gần nhất (cửa hàng ứng dụng, cộng đồng người chơi).")
         else:
-            steps.append("Cần báo cáo ngành có nêu phương pháp và dữ liệu trong 18 tháng gần nhất cho nội dung: "
-                         f"{sub_text}")
+            steps.append("Cần báo cáo ngành có nêu phương pháp và dữ liệu trong 18 tháng gần nhất.")
         if "stale" in codes:
             steps.append("Các số liệu tìm được đã quá cũ; cần số liệu mới hơn cùng phạm vi đo.")
         return steps

@@ -41,6 +41,26 @@ class Index:
             order.append(i)
             if len(order) == k:
                 break
-        return [{"chunk_id": self.rows[i][0], "source_id": self.rows[i][1], "page": self.rows[i][2],
-                 "text": self.rows[i][3], "is_synthetic": self.rows[i][4],
-                 "score": round(float(scores[i]), 3)} for i in order if scores[i] > 0]
+        return [self._hit(i, scores) for i in order if scores[i] > 0]
+
+    def search_split(self, query: str, k_real: int, k_syn: int, per_source: int | None = None) -> list[dict]:
+        """Same as search(k_real, synthetic=False) + search(k_syn, synthetic=True), scoring the corpus once."""
+        scores = self.bm25.get_scores(tokens(query))
+        want = {False: k_real, True: k_syn}
+        picked, seen = {False: [], True: []}, {}
+        for i in sorted(range(len(scores)), key=lambda i: -scores[i]):
+            syn = bool(self.rows[i][4])
+            if len(picked[syn]) >= want[syn]:
+                if all(len(picked[b]) >= want[b] for b in want):
+                    break
+                continue
+            sid = self.rows[i][1]
+            if per_source and seen.get(sid, 0) >= per_source:
+                continue
+            seen[sid] = seen.get(sid, 0) + 1
+            picked[syn].append(i)
+        return [self._hit(i, scores) for i in picked[False] + picked[True] if scores[i] > 0]
+
+    def _hit(self, i: int, scores) -> dict:
+        return {"chunk_id": self.rows[i][0], "source_id": self.rows[i][1], "page": self.rows[i][2],
+                "text": self.rows[i][3], "is_synthetic": self.rows[i][4], "score": round(float(scores[i]), 3)}

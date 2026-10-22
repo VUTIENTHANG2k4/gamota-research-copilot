@@ -65,9 +65,7 @@ def retrieve_extract(question: str, tag: str, context: dict | None = None) -> di
         # Mission 3 round 3: real documents get their own 8 slots. Before, SYNTHETIC test documents took 51.6% of
         # the top-8 slots of real questions (evaluator, round 2), and the real-documents memo then had nothing left.
         # SYNTHETIC documents are searched separately (SYN_K slots) for test mode, unless RETRIEVE_SYNTHETIC=0.
-        chunks = index().search(q, REAL_K, per_source=2, synthetic=False)
-        if WITH_SYNTHETIC:
-            chunks += index().search(q, SYN_K, per_source=2, synthetic=True)
+        chunks = index().search_split(q, REAL_K, SYN_K if WITH_SYNTHETIC else 0, per_source=2)
         sub = {"id": sq.id, "text": sq.text, "search_query": sq.search_query, "search_query_en": sq.search_query_en,
                "retrieved": [{k: c[k] for k in ("chunk_id", "source_id", "page", "score")} for c in chunks],
                "claims": [], "extract_retries": None}
