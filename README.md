@@ -14,7 +14,7 @@ Trợ lý AI nghiên cứu thị trường game cho Gamota. Nhận một câu h�
 3. [Mức tin cậy được tính thế nào](#mức-tin-cậy-được-tính-thế-nào)
 4. [Giao diện](#giao-diện)
 5. [Kho tài liệu](#kho-tài-liệu)
-6. [Kết quả kiểm thử](#kết-quả-kiểm-thử)
+6. [Bộ kiểm thử và kết quả](#bộ-kiểm-thử-và-kết-quả)
 7. [Cấu trúc thư mục](#cấu-trúc-thư-mục)
 8. [Chạy cục bộ](#chạy-cục-bộ)
 9. [Triển khai](#triển-khai)
@@ -111,34 +111,92 @@ Tài khoản do người triển khai khai báo trong biến môi trường `APP
 
 Danh mục ở `backend/corpus/sources.csv` (cột `is_synthetic`), nhóm nguồn trùng gốc ở `backend/corpus/origin_groups.csv`. Tài liệu SYNTHETIC luôn mang nhãn trên giao diện và **không bao giờ** được dùng để kết luận về thị trường thật: memo chỉ tính tài liệu thật, kết quả có tài liệu SYNTHETIC chỉ dùng ở chế độ thử.
 
-## Kết quả kiểm thử
+## Bộ kiểm thử và kết quả
 
-Kỳ vọng của mỗi kịch bản được chốt **trước khi** viết mã. Kịch bản không đạt được báo cáo nguyên trạng, không hạ chuẩn.
+Kỳ vọng của mỗi kịch bản được chốt **trước khi** viết mã và không sửa sau khi thấy kết quả. Kịch bản không đạt được báo cáo nguyên trạng.
 
-**Mission 3 so với Mission 2** (evaluator chấm độc lập vòng chạy thật 2; người chấm biết bản nào là Mission 2, bản nào là Mission 3, nên không phải chấm mù):
+Kết quả Mission 3 dưới đây lấy từ báo cáo chấm độc lập vòng chạy thật 2 (`backend/tests/reports/20261021-m3-round2-evaluator.md`). Người chấm biết bản nào là Mission 2, bản nào là Mission 3, nên đây **không phải chấm mù**. "Chế độ thử" nghĩa là có tài liệu tự soạn `SYNTHETIC`; kết quả ở chế độ này chỉ chứng minh cơ chế, không nói gì về thị trường thật.
 
-| Kịch bản | Mission 2 | Mission 3 |
+### Đối chiếu với yêu cầu bộ kiểm thử Mission 3
+
+| Yêu cầu | Dự án đáp ứng bằng | Kết quả |
 |---|---|---|
-| T11: nguồn yếu mới hơn mâu thuẫn với nguồn mạnh (12 so với 30 triệu lượt tải) | Không đạt | Đạt |
-| T12: cùng tổ chức sửa số (20 thành 26 triệu USD) | Không đạt | Đạt |
-| T13: chỉ có số liệu quá cũ (2021, 2022) | Không đạt | Đạt có điều kiện |
-| T14: nghiên cứu tiếp giữ bối cảnh | Hỏi lại để làm rõ | Đạt |
-| T15: câu hỏi tiếp không liên quan | Không có tính năng | Đạt có điều kiện |
-| T5: từ chối câu hỏi về retention nội bộ | Không đạt | Đạt có điều kiện |
-| Từ chối đúng ở cấp tổng thể (Q4, Q5, X3) | 2/3 | 3/3 |
-| Câu bị hạ nhầm thành "suy luận" | 4/5 lần hạ là nhầm | 0 |
-| T16: câu "Có thể tin" kiểm chứng được | không đo | Không kiểm được đầy đủ: tầng "Có thể tin" trống ở vòng 2 |
-| Kiểm thử tự động (pytest, mô hình giả) | 36 | 60 |
+| Chạy lại các test quan trọng của Mission 2 để kiểm tra regression | **R1** (pytest) và **R2** (chạy lại T1-T9 và các bẫy D1-D5 bằng mã Mission 3) | R1 Đạt; **R2 Không đạt**: T1-T9 không có kịch bản nào tụt từ Đạt xuống Không đạt, nhưng bẫy D4 tụt từ Đạt xuống Không đạt |
+| Bổ sung tối thiểu 03 test cho phần cải tiến | **T11-T16** (6 test) và **R3** | Xem bảng [Test cho phần cải tiến](#test-cho-phần-cải-tiến) |
+| Trong đó có 01 test cho Change Request | **Chưa có.** Dự án không nhận Change Request; mã **T10** được giữ chỗ nhưng chưa viết kỳ vọng, chưa có mã, chưa chạy | Không có kết quả |
+| Trong đó có 01 edge case / tình huống khó | **T11** (khó: nguồn yếu mới hơn mâu thuẫn nguồn mạnh); thêm **T12** (khó) và **T13**, **T15** (biên) | T11 Đạt (chế độ thử) |
+| Trong đó có 01 regression test cho chức năng cũ | **R3**: câu Q4 phải được từ chối ở cấp tổng thể (chức năng "Chưa đủ căn cứ" của Mission 2) | Đạt có điều kiện |
 
-**Chưa đạt, báo cáo nguyên trạng:**
+### Câu hỏi kiểm thử và nơi lưu
 
-- Với tài liệu thật, mọi câu hỏi thật vẫn ra "Chưa đủ căn cứ" ở cấp tổng thể. Số câu hỏi con có kết luận: Mission 2 6/50, Mission 3 vòng 2 0/60. Vòng 3 (tự đo, chưa chấm độc lập) tách chỗ tìm kiếm riêng cho tài liệu thật và có lại câu hỏi con trả lời được ở Q1 và Q3.
-- Căn cứ chính đúng và liên quan: 36,4% (vòng 1), 80% (vòng 2), mục tiêu 90%.
-- Nhãn mức liên quan khớp với người chấm: 71,6%, mục tiêu 80%.
-- T1, T7, T9 vẫn không đạt; bẫy D4 trượt ở vòng 2. Độ ổn định giữa hai lần chạy chưa đo được.
-- Nguyên nhân chính: tìm kiếm từ khóa bỏ sót số liệu có trong kho, mô hình trích sót, bảng trong PDF bị đọc sai.
+| Mã | Câu hỏi | Dùng cho | Nơi lưu |
+|---|---|---|---|
+| Q1 | Có nên làm game idle RPG cho mobile Việt Nam năm sau không? | T8 | `backend/tests/questions.json` |
+| Q2 | Quy mô doanh thu mobile game Việt Nam gần nhất là bao nhiêu? | T2, câu cha của T14 | `backend/tests/questions.json` |
+| Q3 | Quy định hiện hành về phát hành game online tại Việt Nam là gì? | T1, T9, câu cha của T15 | `backend/tests/questions.json` |
+| Q4 | Retention D7 của game X của Gamota quý gần nhất là bao nhiêu? | T5, R3 | `backend/tests/questions.json` |
+| Q5 | Người chơi phàn nàn gì nhiều nhất về game đối thủ Y? | T8, từ chối tổng thể | `backend/tests/questions.json` |
+| A | Doanh thu nhóm game idle RPG tăng bao nhiêu trong quý II/2026? | T3 (trùng nguồn) | `backend/tests/run_eval.py` |
+| B | Thể loại idle RPG chiếm bao nhiêu phần trăm lượt tải mobile game Việt Nam năm 2025? | bẫy D4 | `backend/tests/run_eval.py` |
+| AMB | Thị trường game casual thế nào? | T6 (câu mơ hồ) | `backend/tests/run_eval.py` |
+| T7 | 3 truy vấn vào hai báo cáo PDF có bảng (S005, S006) | T7 | `backend/tests/run_eval.py` |
+| X1 | Thị trường game nông trại trên mobile tại Việt Nam năm 2025 có bao nhiêu lượt tải? | T11 | `backend/scripts/m3_live.py` |
+| X2 | Doanh thu game cờ tướng trên mobile tại Việt Nam năm 2025 là bao nhiêu? | T12 | `backend/scripts/m3_live.py` |
+| X3 | Doanh thu game đua xe trên mobile tại Việt Nam là bao nhiêu? | T13 | `backend/scripts/m3_live.py` |
+| T14 | (hỏi tiếp từ Q2, sau khi loại nguồn S017) Riêng nhóm game nhập vai thì chiếm bao nhiêu trong đó? | T14 | `backend/scripts/m3_live.py` |
+| T15 | (hỏi tiếp từ Q3) Giá cà phê Robusta Tây Nguyên tháng 9/2026 thế nào? | T15 | `backend/scripts/m3_live.py` |
 
-Báo cáo đầy đủ (tiếng Việt) trong `backend/tests/reports/`:
+Ngoài ra: `backend/tests/retrieval_gold.json` (14 câu có đáp án chuẩn để đo khâu tìm kiếm) và 64 test tự động trong `backend/tests/test_*.py` (mô hình giả, không tốn hạn mức).
+
+### Regression: chạy lại test của Mission 2
+
+| Test | Kiểm tra gì | Mission 2 | Mission 3 (vòng 2) |
+|---|---|---|---|
+| T1 | Q3, nhiều nguồn rõ ràng: kết luận phải có quy tắc giờ chơi 60/180 phút | Không đạt | Không đạt (đoạn chứa quy tắc không được tìm thấy) |
+| T2 | Q2, hai nguồn mạnh cho hai con số do khác định nghĩa | Đạt (chỉ ở chế độ thử) | **Đạt có điều kiện** (lời giải thích dùng kiến thức ngoài claim) |
+| T3 | Nhiều bài đăng lại cùng một thông cáo chỉ tính là một nguồn | Đạt | Đạt |
+| T4 | Số liệu cũ không được dùng làm kết luận | Đạt | Đạt |
+| T5 | Q4, thiếu dữ liệu: phải từ chối | Không đạt | Đạt có điều kiện (xem R3) |
+| T6 | Câu hỏi mơ hồ: hỏi lại 1-3 câu trước khi nghiên cứu | Đạt | Đạt |
+| T7 | Đọc đúng số trong bảng, biểu đồ PDF | Không đạt | Không đạt (biểu đồ tròn vẫn đọc sai) |
+| T8 | So với AI trả lời thẳng: không có con số thiếu căn cứ | Không đạt | Đạt, nhưng hiển nhiên: ở chế độ thật không có câu kết luận nào |
+| T9 | Phân biệt dự thảo với văn bản đang có hiệu lực (Q3) | Không đạt | Không đạt |
+| D1-D3 | Các bẫy trong tài liệu tự soạn | Đạt | Đạt |
+| D4 | Mâu thuẫn thật giữa hai tài liệu tự soạn (SYN07, SYN08) | Đạt | **Không đạt**: mô hình chép sai dấu câu, bước kiểm trích dẫn loại cả hai claim; không phải do luật mới |
+| D5 | Tài liệu không liên quan (SYN09) | Không kiểm được | Không kiểm được |
+| R1 | pytest | 36 đạt | 58 đạt khi chấm; 64 đạt ở lần chạy gần nhất (tự chạy, chưa qua người chấm) |
+
+### Test cho phần cải tiến
+
+| Test | Loại | Tình huống | Kỳ vọng | Mission 2 | Mission 3 (vòng 2) |
+|---|---|---|---|---|---|
+| T10 | Change Request | Không có Change Request | Chưa viết | – | **Chưa có** |
+| T11 | Khó, chế độ thử | X1: nguồn hạng A nói 12 triệu lượt tải, diễn đàn hạng C mới hơn nói 30 triệu | 12 triệu là căn cứ chính; 30 triệu ghi "nguồn yếu bất đồng", không kéo mức xuống | Không đạt (không thấy mâu thuẫn, hạ nhầm câu 12 triệu) | Đạt. Vòng 1 lần đầu không đạt, đạt sau một lần sửa mã |
+| T12 | Khó, chế độ thử | X2: cùng một viện sửa số từ 20 thành 26 triệu USD | Dùng 26 triệu; 20 triệu ghi "đã được cập nhật" | Không đạt | Đạt, có lưu ý về phạm vi |
+| T13 | Biên, chế độ thử | X3: chỉ có số liệu năm 2021, 2022 | Từ chối, nêu ngày dữ liệu; số cũ chỉ ở mục lịch sử | Không đạt | Đạt có điều kiện (lý do chỉ nêu năm 2022) |
+| T14 | Cải tiến | Hỏi tiếp từ Q2 sau khi loại nguồn S017 | Giữ phạm vi Việt Nam, mobile, doanh thu; không dùng lại S017; không hỏi lại | Hỏi lại để làm rõ | Đạt |
+| T15 | Biên | Hỏi tiếp từ Q3 một câu không liên quan | Không kế thừa gì, không kết luận | Không có tính năng | Đạt có điều kiện |
+| T16 | Kiểm chứng | Câu "Có thể tin" truy vết được về nguồn | Có mã claim, số có trong đoạn gốc | Không đo | **Không kiểm được đầy đủ**: không câu hỏi con nào được xếp "Có thể tin" |
+| R3 | Regression | Q4: Retention D7 nội bộ | Tổng thể "Chưa đủ căn cứ"; gợi ý cần dữ liệu nội bộ của game X | Không đạt (vẫn ghi "Trung bình") | Đạt có điều kiện (gợi ý dữ liệu nội bộ lặp cả ở câu hỏi về mức trung bình ngành) |
+
+### Chỉ số (mục tiêu chốt trước)
+
+| Chỉ số | Mục tiêu | Mission 2 | Mission 3 (vòng 2) | Trạng thái |
+|---|---|---|---|---|
+| Từ chối đúng ở cấp tổng thể (Q4, Q5, X3) | 100% | 2/3 | 3/3 | Đạt |
+| Số liệu cũ hoặc đã thay thế nằm trong "Có thể tin" | 0 | – | 0 | Đạt, nhưng hiển nhiên vì mức này trống |
+| Căn cứ chính đúng và liên quan (chấm chặt) | ≥ 90% | 20% | 80% (mẫu 5 câu, đều tự soạn; chế độ thật 0 câu) | Không đạt |
+| Câu bị hạ nhầm thành "suy luận" | 0 | 4/5 lần hạ là nhầm | 0 (mẫu 4 câu) | Đạt, mẫu nhỏ |
+| Nhãn mức liên quan khớp với người chấm | ≥ 80% | – | 71,6% | Không đạt |
+| Regression (Đạt tụt xuống Không đạt) | 0 | – | 1 (D4) | Không đạt |
+| Độ ổn định giữa hai lần chạy | đo và báo cáo | không đo | chỉ so được ở T7, và kết quả khác nhau | Chưa đo đầy đủ |
+
+### Hạn chế chính rút ra từ kiểm thử
+
+- Với tài liệu thật, vòng 2 không có câu hỏi con nào có kết luận (0/60; Mission 2: 6/50). Vòng 3 (nhóm tự đo, chưa chấm độc lập) tách chỗ tìm kiếm riêng cho tài liệu thật và có lại câu hỏi con trả lời được ở Q1 và Q3.
+- Nguyên nhân chính: tìm kiếm từ khóa bỏ sót số liệu có trong kho, bước kiểm trích dẫn khớp nguyên văn quá chặt (vòng 2 chỉ 59,5% claim qua được), bảng trong PDF bị đọc sai.
+
+### Báo cáo đầy đủ (tiếng Việt) trong `backend/tests/reports/`
 
 | Tệp | Nội dung |
 |---|---|
@@ -230,4 +288,4 @@ Thử giao diện không cần mô hình: `.venv\Scripts\python frontend\tests\m
 - Đăng nhập đơn giản: không có đăng ký, quên mật khẩu hay phân quyền, mọi người dùng chung một lịch sử. Đủ để chặn người lạ dùng hạn mức mô hình, không phải bảo mật cho dữ liệu thật.
 - Endpoint miễn phí `:free` có ghi log sử dụng: chỉ gửi tài liệu công khai và SYNTHETIC, không nhập dữ liệu thật của Gamota hoặc dữ liệu cá nhân.
 
-Giới hạn cũng được in kèm khi lưu memo thành PDF và ghi trong tệp Word xuất ra.
+Trong sản phẩm, danh sách giới hạn chỉ còn được in kèm khi lưu memo thành PDF và ghi trong tệp Word xuất ra; giao diện web không còn trang riêng cho giới hạn.
