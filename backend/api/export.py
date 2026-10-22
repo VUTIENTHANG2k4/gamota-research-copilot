@@ -4,6 +4,8 @@ import io
 from docx import Document
 from docx.shared import Pt
 
+from app.memo import conflict_line
+
 LEVEL_VI = {"High": "Cao", "Medium": "Trung bình", "Low": "Thấp", "Chưa đủ căn cứ": "Chưa đủ căn cứ"}
 LIMITATIONS = [
     "Đây là MVP/prototype do AI biên soạn, không phải sản phẩm hoàn chỉnh; hãy mở đoạn gốc của từng claim trước khi dùng.",
@@ -52,10 +54,8 @@ def memo_docx(run: dict, effective_p3: dict, reviews: dict[str, dict], stale: bo
             for p in s["points"]:
                 tag = "" if p["is_fact"] else " [suy luận]"
                 d.add_paragraph(f"{p['text']}{tag} ({'; '.join(p['citations'])})", style="List Bullet")
-            for x in s["conflicts"]:
-                if x.get("decided_by", "llm") == "llm":
-                    d.add_paragraph(f"Mâu thuẫn ({x['cause']}, {x['status']}): {x['explanation']} "
-                                    f"Gợi ý: {x.get('usage_suggestion', '')}", style="List Bullet")
+        for x in s["conflicts"]:  # every conflict, code- or model-labelled, refused sub-questions included
+            d.add_paragraph(conflict_line(x)[2:], style="List Bullet")
         for u in s.get("uncertain", []):
             d.add_paragraph(f"Chưa chắc chắn: {u['text']}", style="List Bullet")
         if s.get("history"):

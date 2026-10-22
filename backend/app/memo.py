@@ -64,6 +64,14 @@ def _numbers_ok(text: str, claims: list[dict]) -> bool:
     return all(forms & pool for forms in numbers_in(ID_TOKEN.sub(" ", text)))
 
 
+def conflict_line(x: dict) -> str:
+    """One conflict as text, whether code or the model labelled it (memo markdown and Word export)."""
+    who = "code xếp loại" if x.get("decided_by") == "code" else "AI gán nguyên nhân"
+    tip = f" Gợi ý dùng: {x['usage_suggestion']}" if x.get("usage_suggestion") else ""
+    return (f"- Mâu thuẫn {x['claim_a']} / {x['claim_b']} ({x['cause']}, {x['status']}, {who}): "
+            f"{x['explanation']}{tip}")
+
+
 def build(p3: dict, mode: str, tag: str) -> dict:
     """mode 'real' = no SYNTHETIC claims (headline memo); 'test' = SYNTHETIC included, labelled."""
     vkey = "verdict_real_only" if mode == "real" else "verdict_with_synthetic"
@@ -78,8 +86,11 @@ def build(p3: dict, mode: str, tag: str) -> dict:
         others = [c for c in claims if c["claim_id"] not in {m["claim_id"] for m in main}]
         subs.append({"id": s["id"], "text": s["text"], "verdict": v, "main": main, "others": others,
                      "kind": s.get("data_kind") or "market",
-                     "searched": [r for r in s.get("retrieved", [])
-                                  if mode == "test" or trust.sources().get(r["source_id"], {}).get("is_synthetic") != "true"],
+                     # None when the run predates the saved retrieval list: unknown, not "nothing found"
+                     "searched": None if "retrieved" not in s else list({
+                         (r["source_id"], r["page"]): r for r in s["retrieved"]
+                         if mode == "test" or trust.sources().get(r["source_id"], {}).get("is_synthetic") != "true"
+                     }.values()),
                      "conflicts": conflicts, "by_id": by_id})
         if not v["refused"] and main:
             answered_input.append((s, main))
@@ -154,8 +165,9 @@ def build(p3: dict, mode: str, tag: str) -> dict:
                                   for h in s["verdict"].get("history", []) if h["claim_id"] in s["by_id"]],
                       "next_steps": s["verdict"].get("next_steps", []),
                       # what was searched, so a reader can tell "the corpus has nothing" from "retrieval missed it"
-                      "searched": [{"source_id": r["source_id"], "page": r["page"], "chunk_id": r["chunk_id"]}
-                                   for r in s["searched"]] if s["verdict"]["refused"] else [],
+                      **({"searched": [{"source_id": r["source_id"], "page": r["page"], "chunk_id": r["chunk_id"]}
+                                       for r in s["searched"]] if s["verdict"]["refused"] else []}
+                         if s["searched"] is not None else {}),
                       "conflicts": s["conflicts"],
                       "reference_signals_cd": [{"claim_id": c["claim_id"], "citation": _cite(c),
                                                 "draft_flag": trust.is_draft(c, s["kind"]),
@@ -199,13 +211,11 @@ def render(m: dict) -> str:
         for h in s.get("history", []):
             out.append(f"- Lịch sử ({h['code']}, dữ liệu {h['data_date']}): {h['content']} ({h['citation']})")
         for x in s["conflicts"]:
-            if x.get("decided_by") == "llm":
-                out.append(f"- Mâu thuẫn ({x['cause']}, {x['status']}): {x['explanation']} "
-                           f"Gợi ý dùng: {x.get('usage_suggestion', '')}")
+            out.append(conflict_line(x))
         if s["reference_signals_cd"]:
             out.append("Tín hiệu tham khảo hạng C/D (không dùng làm kết luận):")
             out += [f"  - {c['content']} ({c['citation']})" for c in s["reference_signals_cd"]]
-        if s.get("refused_text"):
+        if s.get("refused_text") and "searched" in s:
             found = ", ".join(f"{r['source_id']} tr.{r['page']}" for r in s.get("searched", []))
             out.append("Đã tìm trong: " + (found or "không tìm thấy đoạn tài liệu nào trong kho"))
         if s.get("next_steps"):

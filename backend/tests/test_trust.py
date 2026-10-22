@@ -212,3 +212,67 @@ def test_memo_lists_what_was_searched_for_refused_subquestions():
     m = memo.build({"question": "Doanh thu?", "subs": [sub], "core": ["sq1"]}, "real", "t")
     assert [r["source_id"] for r in m["subs"][0]["searched"]] == ["S004"]  # SYNTHETIC hidden in real mode
     assert "Đã tìm trong: S004 tr.1" in m["markdown"]
+
+
+def _refused_sub(**extra):
+    return {"id": "sq1", "text": "Doanh thu?", "data_kind": "market", "claims": [], "conflicts": [],
+            "verdict_real_only": trust.evaluate([], [], "market", "Doanh thu?"),
+            "verdict_with_synthetic": trust.evaluate([], [], "market", "Doanh thu?"), **extra}
+
+
+def test_memo_does_not_claim_nothing_was_searched_for_runs_without_a_saved_list():
+    # runs made before round 3 have no 'retrieved' in p3: unknown, so no "Đã tìm trong" line at all
+    from app import memo
+    m = memo.build({"question": "Doanh thu?", "subs": [_refused_sub()], "core": ["sq1"]}, "real", "t")
+    assert "searched" not in m["subs"][0]
+    assert "Đã tìm trong" not in m["markdown"]
+
+
+def test_memo_searched_lists_each_page_once():
+    from app import memo
+    r = [{"chunk_id": f"S004-p1-{i}", "source_id": "S004", "page": 1, "score": 1.0} for i in range(2)]
+    m = memo.build({"question": "Doanh thu?", "subs": [_refused_sub(retrieved=r)], "core": ["sq1"]}, "real", "t")
+    assert len(m["subs"][0]["searched"]) == 1
+    assert "Đã tìm trong: S004 tr.1" in m["markdown"] and "S004 tr.1, S004 tr.1" not in m["markdown"]
+
+
+def test_code_decided_conflicts_appear_in_memo_text_and_word_export():
+    from app import memo
+    from api.export import memo_docx
+    import io
+    from docx import Document
+    x = {"claim_a": "C-a", "claim_b": "C-b", "cause": "weak_dissent", "status": "explained", "decided_by": "code",
+         "explanation": "Nguồn hạng C/D cho số khác nguồn hạng A/B.", "usage_suggestion": ""}
+    m = {"question": "Q", "overall": {"level": "Chưa đủ căn cứ", "reason": "r"}, "gaps": [], "key_assumptions": [],
+         "next_steps": [], "subs": [{"id": "sq1", "text": "Doanh thu?", "refused_text": "x",
+                                     "verdict": {"reason": "r", "level": "Chưa đủ căn cứ"}, "points": [],
+                                     "conflicts": [x], "reference_signals_cd": []}]}
+    assert "code xếp loại" in memo.conflict_line(x)
+    doc = Document(io.BytesIO(memo_docx({"question": "Q", "memo": m}, {"subs": []}, {}, False)))
+    assert any("weak_dissent" in p.text and "code xếp loại" in p.text for p in doc.paragraphs)
+
+
+def test_retrieve_synthetic_switch(monkeypatch):
+    from app import pipeline
+
+    class FakeIndex:
+        def search(self, q, k, per_source, synthetic):
+            sid = "SYN01" if synthetic else "S004"
+            return [{"chunk_id": f"{sid}-p1-0", "source_id": sid, "page": 1, "score": 1.0, "is_synthetic": synthetic,
+                     "text": "x"}]
+
+    class Brief:
+        needs_clarification = False
+        related_to_parent = False
+        sub_questions = [type("SQ", (), {"id": "sq1", "text": "t", "search_query": "a", "search_query_en": "b"})()]
+
+        def model_dump(self):
+            return {}
+
+    monkeypatch.setattr(pipeline, "index", lambda: FakeIndex())
+    monkeypatch.setattr(pipeline, "make_brief", lambda *a, **k: (Brief(), 0))
+    monkeypatch.setattr(pipeline, "extract_claims", lambda *a, **k: (type("E", (), {"claims": []})(), 0))
+    for flag, expected in ((True, {"S004", "SYN01"}), (False, {"S004"})):
+        monkeypatch.setattr(pipeline, "WITH_SYNTHETIC", flag)
+        out = pipeline.retrieve_extract("q", "t")
+        assert {r["source_id"] for r in out["subs"][0]["retrieved"]} == expected

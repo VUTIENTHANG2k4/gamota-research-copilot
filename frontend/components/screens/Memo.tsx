@@ -163,6 +163,12 @@ function RefusedRow({ sub, runId, core, m3, current }: { sub: MemoSub; runId: st
       {m3 && steps.length > 0 && (
         <p className="mt-1 text-[14px]"><strong className="text-accent">Nên tìm tiếp:</strong> {steps.join(" ")}</p>
       )}
+      {(sub.uncertain ?? []).length > 0 || sub.conflicts.length > 0 ? (
+        <div className="mt-2 space-y-2">
+          {sub.uncertain && sub.uncertain.length > 0 && <UncertainList items={sub.uncertain} />}
+          {sub.conflicts.length > 0 && <ConflictList items={sub.conflicts} />}
+        </div>
+      ) : null}
       <div className="no-print mt-1 flex flex-wrap gap-x-4 text-[13px]">
         <Link href={`/runs/${encodeURIComponent(runId)}/evidence#sub-${sub.id}`} className="font-semibold text-accent underline">
           Đã tìm những tài liệu nào
@@ -180,6 +186,37 @@ function RefusedRow({ sub, runId, core, m3, current }: { sub: MemoSub; runId: st
         </details>
       )}
     </li>
+  );
+}
+
+function ConflictList({ items }: { items: MemoSub["conflicts"] }) {
+  return (
+    <div className="rounded-lg border border-warn-border bg-warn-bg/60 p-3">
+      <p className="font-semibold text-warn-text">Mâu thuẫn giữa các nguồn ({items.length})</p>
+      <ul className="mt-2 space-y-2">
+        {items.map((c, i) => (
+          <li key={i} className="rounded border border-line bg-surface p-2 text-[14px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <ClaimRef id={c.claim_a} />
+              <span aria-hidden>so với</span>
+              <ClaimRef id={c.claim_b} />
+            </div>
+            <p className="mt-1">
+              <strong>{causeVi(c.cause)}</strong>
+              {" · "}
+              <span className={c.status === "unexplained" ? "font-bold text-danger-text" : ""}>
+                {c.status === "explained" ? "đã giải thích nguyên nhân" : "CHƯA giải thích được"}
+              </span>
+              {c.decided_by && (
+                <span className="text-muted"> · {c.decided_by === "code" ? "code xếp loại" : "AI gán nguyên nhân"}</span>
+              )}
+              {c.synthetic_involved && <> <SyntheticTag className="align-middle" /></>}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[13px]">Giải thích đầy đủ và gợi ý dùng con số nào ở bước Đối soát.</p>
+    </div>
   );
 }
 
@@ -347,34 +384,7 @@ function SubBlock({
         {sub.main_evidence && sub.main_evidence.length > 0 && <MainEvidence items={sub.main_evidence} />}
         {sub.uncertain && sub.uncertain.length > 0 && <UncertainList items={sub.uncertain} />}
 
-        {sub.conflicts.length > 0 && (
-          <div className="rounded-lg border border-warn-border bg-warn-bg/60 p-3">
-            <p className="font-semibold text-warn-text">Mâu thuẫn giữa các nguồn ({sub.conflicts.length})</p>
-            <ul className="mt-2 space-y-2">
-              {sub.conflicts.map((c, i) => (
-                <li key={i} className="rounded border border-line bg-surface p-2 text-[14px]">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ClaimRef id={c.claim_a} />
-                    <span aria-hidden>so với</span>
-                    <ClaimRef id={c.claim_b} />
-                  </div>
-                  <p className="mt-1">
-                    <strong>{causeVi(c.cause)}</strong>
-                    {" · "}
-                    <span className={c.status === "unexplained" ? "font-bold text-danger-text" : ""}>
-                      {c.status === "explained" ? "đã giải thích nguyên nhân" : "CHƯA giải thích được"}
-                    </span>
-                    {c.decided_by && (
-                      <span className="text-muted"> · {c.decided_by === "code" ? "code xếp loại" : "AI gán nguyên nhân"}</span>
-                    )}
-                    {c.synthetic_involved && <> <SyntheticTag className="align-middle" /></>}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[13px]">Giải thích đầy đủ và gợi ý dùng con số nào ở bước Đối soát.</p>
-          </div>
-        )}
+        {sub.conflicts.length > 0 && <ConflictList items={sub.conflicts} />}
 
         {history.length > 0 && <HistoryList items={history} />}
 
@@ -518,7 +528,7 @@ function MemoView({ memo, run }: { memo: Memo; run: Run }) {
         </div>
       )}
 
-      {refusedSubs.length > 0 && <RefusedList subs={refusedSubs} run={run} core={core} m3={m3} />}
+      {refusedSubs.length > 0 && <RefusedList subs={refusedSubs} run={run} core={coreMarked ? core : new Set()} m3={m3} />}
 
       {/* M3: gaps repeat the refused list above, so they are shown only for older memos */}
       {!m3 && <ListSection title="Khoảng trống dữ liệu" items={memo.gaps} empty="Memo không ghi khoảng trống nào." />}

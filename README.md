@@ -201,6 +201,7 @@ Sao chép `.env.example` thành `.env` ở thư mục gốc và điền giá tr�
 | `OPENROUTER_API_KEYS` | Không | Key dự phòng, cách nhau bằng dấu phẩy; dùng lần lượt khi key trước hết hạn mức ngày |
 | `OPENROUTER_BASE_URL`, `LLM_MODEL`, `LLM_TEMPERATURE` | Không | Địa chỉ API, mô hình, nhiệt độ (mặc định 0) |
 | `LLM_CONCURRENCY` | Không | Số lượt gọi mô hình song song (mặc định 4; 1 = tuần tự) |
+| `RETRIEVE_SYNTHETIC` | Không | `0` = không tìm tài liệu SYNTHETIC ở lượt chạy thường, tiết kiệm hạn mức; câu hỏi bẫy X1-X3 khi đó không còn gì để xem (mặc định `1`) |
 | `DATABASE_URL` | Có | Chuỗi kết nối PostgreSQL |
 | `APP_USERS`, `AUTH_SECRET` | Không | Bật đăng nhập: danh sách tài khoản và khóa ký phiên. Không đặt `APP_USERS` thì sản phẩm mở cho mọi người |
 | `CORS_ORIGINS`, `CORS_ORIGIN_REGEX` | Không | Địa chỉ giao diện được phép gọi API |
