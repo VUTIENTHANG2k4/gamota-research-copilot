@@ -115,19 +115,19 @@ Danh mục ở `backend/corpus/sources.csv` (cột `is_synthetic`), nhóm nguồ
 
 Kỳ vọng của mỗi kịch bản được chốt **trước khi** viết mã. Kịch bản không đạt được báo cáo nguyên trạng, không hạ chuẩn.
 
-**Mission 3 so với Mission 2** (chấm độc lập, mù bản):
+**Mission 3 so với Mission 2** (evaluator chấm độc lập vòng chạy thật 2; người chấm biết bản nào là Mission 2, bản nào là Mission 3, nên không phải chấm mù):
 
 | Kịch bản | Mission 2 | Mission 3 |
 |---|---|---|
 | T11: nguồn yếu mới hơn mâu thuẫn với nguồn mạnh (12 so với 30 triệu lượt tải) | Không đạt | Đạt |
 | T12: cùng tổ chức sửa số (20 thành 26 triệu USD) | Không đạt | Đạt |
-| T13: chỉ có số liệu quá cũ (2021, 2022) | Không đạt | Đạt, có lưu ý |
+| T13: chỉ có số liệu quá cũ (2021, 2022) | Không đạt | Đạt có điều kiện |
 | T14: nghiên cứu tiếp giữ bối cảnh | Hỏi lại để làm rõ | Đạt |
-| T15: câu hỏi tiếp không liên quan | Không có tính năng | Đạt |
-| T5: từ chối câu hỏi về retention nội bộ | Không đạt | Đạt |
+| T15: câu hỏi tiếp không liên quan | Không có tính năng | Đạt có điều kiện |
+| T5: từ chối câu hỏi về retention nội bộ | Không đạt | Đạt có điều kiện |
 | Từ chối đúng ở cấp tổng thể (Q4, Q5, X3) | 2/3 | 3/3 |
-| Câu bị hạ nhầm thành "suy luận" | 5/6 lần hạ là nhầm | 0 |
-| Câu "Có thể tin" kiểm chứng được bằng mã claim | không đo | 10/10 (vòng 1), 4/4 (vòng 2) |
+| Câu bị hạ nhầm thành "suy luận" | 4/5 lần hạ là nhầm | 0 |
+| T16: câu "Có thể tin" kiểm chứng được | không đo | Không kiểm được đầy đủ: tầng "Có thể tin" trống ở vòng 2 |
 | Kiểm thử tự động (pytest, mô hình giả) | 36 | 60 |
 
 **Chưa đạt, báo cáo nguyên trạng:**
