@@ -123,7 +123,7 @@ Kết quả Mission 3 dưới đây lấy từ báo cáo chấm độc lập vò
 |---|---|---|
 | Chạy lại các test quan trọng của Mission 2 để kiểm tra regression | **R1** (pytest) và **R2** (chạy lại T1-T9 và các bẫy D1-D5 bằng mã Mission 3) | R1 Đạt; **R2 Không đạt**: T1-T9 không có kịch bản nào tụt từ Đạt xuống Không đạt, nhưng bẫy D4 tụt từ Đạt xuống Không đạt |
 | Bổ sung tối thiểu 03 test cho phần cải tiến | **T11-T16** (6 test) và **R3** | Xem bảng [Test cho phần cải tiến](#test-cho-phần-cải-tiến) |
-| Trong đó có 01 test cho Change Request | **Chưa có.** Dự án không nhận Change Request; mã **T10** được giữ chỗ nhưng chưa viết kỳ vọng, chưa có mã, chưa chạy | Không có kết quả |
+| Trong đó có 01 test cho Change Request | **T10 = T14**: hỏi sâu hơn cho một nhóm thị trường mà không mất bối cảnh; thêm **T15** (biên) và 4 test tự động. Xem mục [Test cho Change Request](#test-cho-change-request) | T14 Đạt; T15 Đạt có điều kiện |
 | Trong đó có 01 edge case / tình huống khó | **T11** (khó: nguồn yếu mới hơn mâu thuẫn nguồn mạnh); thêm **T12** (khó) và **T13**, **T15** (biên) | T11 Đạt (chế độ thử) |
 | Trong đó có 01 regression test cho chức năng cũ | **R3**: câu Q4 phải được từ chối ở cấp tổng thể (chức năng "Chưa đủ căn cứ" của Mission 2) | Đạt có điều kiện |
 
@@ -170,14 +170,31 @@ Ngoài ra: `backend/tests/retrieval_gold.json` (14 câu có đáp án chuẩn đ
 
 | Test | Loại | Tình huống | Kỳ vọng | Mission 2 | Mission 3 (vòng 2) |
 |---|---|---|---|---|---|
-| T10 | Change Request | Không có Change Request | Chưa viết | – | **Chưa có** |
+| T10 | Change Request | Chính là T14 (và T15), xem mục [Test cho Change Request](#test-cho-change-request) | | | |
 | T11 | Khó, chế độ thử | X1: nguồn hạng A nói 12 triệu lượt tải, diễn đàn hạng C mới hơn nói 30 triệu | 12 triệu là căn cứ chính; 30 triệu ghi "nguồn yếu bất đồng", không kéo mức xuống | Không đạt (không thấy mâu thuẫn, hạ nhầm câu 12 triệu) | Đạt. Vòng 1 lần đầu không đạt, đạt sau một lần sửa mã |
 | T12 | Khó, chế độ thử | X2: cùng một viện sửa số từ 20 thành 26 triệu USD | Dùng 26 triệu; 20 triệu ghi "đã được cập nhật" | Không đạt | Đạt, có lưu ý về phạm vi |
 | T13 | Biên, chế độ thử | X3: chỉ có số liệu năm 2021, 2022 | Từ chối, nêu ngày dữ liệu; số cũ chỉ ở mục lịch sử | Không đạt | Đạt có điều kiện (lý do chỉ nêu năm 2022) |
-| T14 | Cải tiến | Hỏi tiếp từ Q2 sau khi loại nguồn S017 | Giữ phạm vi Việt Nam, mobile, doanh thu; không dùng lại S017; không hỏi lại | Hỏi lại để làm rõ | Đạt |
-| T15 | Biên | Hỏi tiếp từ Q3 một câu không liên quan | Không kế thừa gì, không kết luận | Không có tính năng | Đạt có điều kiện |
+| T14 | Change Request, cải tiến | Hỏi tiếp từ Q2 sau khi loại nguồn S017 | Giữ phạm vi Việt Nam, mobile, doanh thu; không dùng lại S017; không hỏi lại | Hỏi lại để làm rõ | Đạt |
+| T15 | Change Request, biên | Hỏi tiếp từ Q3 một câu không liên quan | Không kế thừa gì, không kết luận | Không có tính năng | Đạt có điều kiện |
 | T16 | Kiểm chứng | Câu "Có thể tin" truy vết được về nguồn | Có mã claim, số có trong đoạn gốc | Không đo | **Không kiểm được đầy đủ**: không câu hỏi con nào được xếp "Có thể tin" |
 | R3 | Regression | Q4: Retention D7 nội bộ | Tổng thể "Chưa đủ căn cứ"; gợi ý cần dữ liệu nội bộ của game X | Không đạt (vẫn ghi "Trung bình") | Đạt có điều kiện (gợi ý dữ liệu nội bộ lặp cả ở câu hỏi về mức trung bình ngành) |
+
+### Test cho Change Request
+
+**Change Request:** sau một kết luận ban đầu, người dùng đặt câu hỏi sâu hơn cho một nhóm thị trường hoặc đối tượng cụ thể. Hệ thống cần tiếp tục nghiên cứu mà không mất hoàn toàn bối cảnh trước đó.
+
+**Cách đáp ứng:** tính năng "Nghiên cứu tiếp" (`POST /api/runs/{id}/followup`, nút "Nghiên cứu tiếp" trên memo). Lần chạy mới kế thừa quyết định cần hỗ trợ, phạm vi, các khoảng trống chưa có căn cứ và quyết định duyệt của chuyên viên (kể cả nguồn đã bị loại); không kế thừa lời văn của memo cũ. Người dùng xem trước và bỏ được phần kế thừa. Nếu câu hỏi mới không liên quan, hệ thống không kế thừa gì và ghi rõ điều đó. Tối đa 3 bước nối tiếp.
+
+| Test | Tình huống | Kỳ vọng (chốt trước khi viết mã) | Mission 2 | Mission 3 (vòng 2) |
+|---|---|---|---|---|
+| **T14** (chính) | Kết luận ban đầu: Q2 "Quy mô doanh thu mobile game Việt Nam gần nhất là bao nhiêu?"; chuyên viên loại mọi claim của nguồn S017. Hỏi sâu cho một nhóm thị trường: "Riêng nhóm game nhập vai thì chiếm bao nhiêu trong đó?" | Phạm vi của brief mới vẫn có Việt Nam, mobile và doanh thu; không claim nào của S017 được dùng làm căn cứ; memo ghi rõ câu cha; không dừng lại để hỏi làm rõ | Mất bối cảnh, hỏi lại để làm rõ | **Đạt** (`backend/runs/m3/round_2/T14/context.json`, `reviews.json`: 5 claim S017 bị loại sẵn) |
+| **T15** (biên) | Từ Q3 (quy định phát hành game), hỏi một câu không liên quan: "Giá cà phê Robusta Tây Nguyên tháng 9/2026 thế nào?" | Đánh dấu không liên quan; không kế thừa gì; không kết luận về thị trường game | Không có tính năng | **Đạt có điều kiện** (`related=false`, 0 quyết định kế thừa; tệp bối cảnh vẫn ghi `inherit: true`) |
+
+Test tự động (mô hình giả) trong `backend/tests/test_api.py`: `test_followup_keeps_context_and_inherits_rejected_source`, `test_unrelated_followup_inherits_nothing`, `test_followup_without_context_and_depth_limit`, `test_followup_only_from_finished_run`.
+
+**Lưu ý trung thực:**
+- Đề bài Change Request nhận được ngày 22/10/2026, **sau khi** tính năng đã được làm (theo yêu cầu 4 của Mission 3: "nghiên cứu sâu thêm mà vẫn giữ đúng bối cảnh") và đã chạy test. Kỳ vọng T14, T15 được chốt ngày 20/10/2026, trước khi viết mã; không có mã nào được sửa riêng cho Change Request. Vì vậy đây không phải một vòng trước và sau riêng cho Change Request.
+- T14 kiểm tra hỏi sâu theo **nhóm thị trường** (thể loại nhập vai). Trường hợp hỏi sâu theo **nhóm đối tượng** (ví dụ độ tuổi, giới tính người chơi) chưa có test chạy thật.
 
 ### Chỉ số (mục tiêu chốt trước)
 
